@@ -1,0 +1,73 @@
+name: Update NPC heights
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-npc-heights
+
+env:
+  TABLE_PATH: src/main/resources/io/mark/hitsplats/npc_heights.tsv
+  DUMP_URL: https://raw.githubusercontent.com/Joshua-F/osrs-dumps/refs/heads/master/config/dump.npc
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Each NPC in the dump is a '// <id>' line, a '[name]' line, then its config fields
+      - name: Generate the table
+        run: |
+          curl -fsSL "$DUMP_URL" -o dump.npc
+          {
+            echo '# NPC id -> NPCComposition.height, the config 124 / overlayheight field.'
+            echo '# The client places hitsplats at (height == -1 ? logicalHeight : height) + animationHeightOffset, halved.'
+            echo '# Only NPCs that set it are listed; everything else falls back to the model height.'
+            echo '# id<TAB>height<TAB>source name'
+            awk '
+              /^\/\/ [0-9]+$/        { id = $2 }
+              /^\[.*\]$/             { name = substr($0, 2, length($0) - 2) }
+              /^overlayheight=/      { split($0, f, "="); printf "%s\t%s\t%s\n", id, f[2], name }
+            ' dump.npc | sort -n
+          } > "$TABLE_PATH"
+          rm dump.npc
+
+      # A moved or truncated dump should fail loudly, not open a PR wiping the table
+      - name: Sanity-check row count
+        run: |
+          n=$(grep -cv '^#' "$TABLE_PATH")
+          echo "$n rows"
+          [ "$n" -ge 20 ] || { echo "::error::npc_heights has $n rows, floor is 20"; exit 1; }
+
+      - name: Summarise the change
+        id: diff
+        run: |
+          added=$(git diff --numstat -- "$TABLE_PATH" | cut -f1)
+          removed=$(git diff --numstat -- "$TABLE_PATH" | cut -f2)
+          echo "added=${added:-0}" >> "$GITHUB_OUTPUT"
+          echo "removed=${removed:-0}" >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/npc-heights
+          commit-message: Update NPC heights from the OSRS config dump
+          title: Update NPC heights
+          body: |
+            Regenerated `npc_heights.tsv` from
+            [Joshua-F/osrs-dumps](https://github.com/Joshua-F/osrs-dumps/blob/master/config/dump.npc).
+
+            `${{ steps.diff.outputs.added }}` lines added, `${{ steps.diff.outputs.removed }}` removed.
+
+            The table maps an NPC id to its `overlayheight`, which the client uses in place of the
+            model height when placing hitsplats. Only NPCs that set it are listed.
+
+            Raised weekly. If this sits unmerged the next run amends this same PR rather than
+            opening another.

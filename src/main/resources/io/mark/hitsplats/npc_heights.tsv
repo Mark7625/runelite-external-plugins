@@ -1,0 +1,40 @@
+# NPC id -> NPCComposition.height, the config 124 / overlayheight field.
+# The client places hitsplats at (height == -1 ? logicalHeight : height) + animationHeightOffset, halved.
+# Only NPCs that set it are listed; everything else falls back to the model height.
+# id<TAB>height<TAB>source name
+123	470	yama_throne
+240	459	black_demon_strongholdcave_1
+1338	50	sarim_seagull_pier
+1339	50	sarim_seagull_pier_big
+2030	380	greater_demon_strongholdcave_1
+2031	380	greater_demon_strongholdcave_2
+2032	380	greater_demon_strongholdcave_3
+5874	459	black_demon_strongholdcave_2
+5875	459	black_demon_strongholdcave_3
+5877	459	black_demon_strongholdcave_5
+7656	340	lesser_demon_slayercave_1
+7657	340	lesser_demon_slayercave_2
+7664	340	lesser_demon_slayercave_3
+13505	350	earth_surge_raised
+13506	350	water_surge_raised
+13507	350	fire_surge_raised
+13508	350	wind_surge_raised
+13528	365	wgs_balance_elemental
+13529	365	wgs_balance_elemental_dying
+13530	365	wgs_balance_elemental_cutscene
+13599	460	tormented_demon_1
+13600	460	tormented_demon_2
+13601	460	tormented_demon_quest_1
+13602	460	tormented_demon_quest_2
+13603	460	invisible_tormented_demon_1
+13604	460	invisible_tormented_demon_2
+13605	460	invisible_tormented_demon_quest_1
+13606	460	invisible_tormented_demon_quest_2
+14938	50	sarim_seagull_pier_big_outdoors
+15111	140	crystal_extractor_headbar
+15113	140	sailing_bt_gwenith_glide_crystal_steering_headbar_npc
+15438	200	giant_wasp
+15439	200	giant_wasp_red
+15733	300	bloodwood_headbar_npc
+15734	200	player_axe_clickbox
+15735	200	player_axe_clickbox_vis

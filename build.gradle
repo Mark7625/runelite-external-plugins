@@ -12,12 +12,13 @@ def runeLiteVersion = '1.8.26'
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
 
-	compileOnly 'org.projectlombok:lombok:1.18.24'
-	annotationProcessor 'org.projectlombok:lombok:1.18.20'
+	compileOnly 'org.projectlombok:lombok:1.18.4'
+	annotationProcessor 'org.projectlombok:lombok:1.18.4'
 
-	testImplementation 'junit:junit:4.13.2'
-	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
-	compileOnly group: 'net.runelite', name:'jshell', version: runeLiteVersion
+	testImplementation 'junit:junit:4.12'
+	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion, {
+		exclude group: 'ch.qos.logback', module: 'logback-classic'
+	}
 }
 
 group = 'io.mark.f2p'

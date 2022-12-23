@@ -1,0 +1,29 @@
+plugins {
+	id 'java'
+}
+
+repositories {
+	maven { url = 'https://repo.runelite.net' }
+	mavenCentral()
+}
+
+def runeLiteVersion = '1.9.+'
+
+dependencies {
+	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
+
+	compileOnly 'org.projectlombok:lombok:1.18.4'
+	annotationProcessor 'org.projectlombok:lombok:1.18.4'
+
+	testImplementation 'junit:junit:4.12'
+	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion, {
+		exclude group: 'ch.qos.logback', module: 'logback-classic'
+	}
+}
+
+group = 'io.mark.hdminimap'
+version = '1.0'
+
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}

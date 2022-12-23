@@ -180,7 +180,7 @@ public class F2pPlugin extends Plugin
 	@Override
 	public void shutDown()
 	{
-
+		client.getItemCompositionCache().reset();
 	}
 
 	private boolean isActive(ActiveType type) {

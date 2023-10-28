@@ -7,10 +7,11 @@ repositories {
 	mavenCentral()
 }
 
-def runeLiteVersion = '1.9.+'
+def runeLiteVersion = '1.10.+'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
+
 
 	compileOnly 'org.projectlombok:lombok:1.18.4'
 	annotationProcessor 'org.projectlombok:lombok:1.18.4'
@@ -19,6 +20,9 @@ dependencies {
 	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion, {
 		exclude group: 'ch.qos.logback', module: 'logback-classic'
 	}
+	testCompileOnly 'org.projectlombok:lombok:1.18.20'
+	testAnnotationProcessor 'org.projectlombok:lombok:1.18.20'
+
 }
 
 group = 'io.mark.hdminimap'

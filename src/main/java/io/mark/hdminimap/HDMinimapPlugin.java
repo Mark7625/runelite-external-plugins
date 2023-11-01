@@ -26,6 +26,7 @@
 package io.mark.hdminimap;
 
 import net.runelite.api.*;
+import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -74,27 +75,14 @@ public class HDMinimapPlugin extends Plugin
 		return (var0 & 0xFF80) + var1;
 	}
 
-	@Subscribe // Default priority, run before 117 HD
-	public void onPluginChanged(PluginChanged event) {
-		applyMinimapChanges();
-	}
-
-	@Subscribe // Default priority, run before 117 HD
-	public void onConfigChanged(ConfigChanged event) {
-		applyMinimapChanges();
+	@Subscribe
+	public void onBeforeRender(BeforeRender beforeRender) {
+		client.setMinimapTileDrawer(this::drawTile);
 	}
 
 	@Override
 	public void shutDown() {
 		client.setMinimapTileDrawer(null);
-	}
-
-	private void applyMinimapChanges() {
-		// Let other plugins decide, after we've reset the map in shutDown()
-		if (!pluginManager.isPluginEnabled(this))
-			return;
-
-		client.setMinimapTileDrawer(this::drawTile);
 	}
 
 	private void drawTile(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1)

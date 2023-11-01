@@ -27,16 +27,12 @@ package io.mark.hdminimap;
 
 import net.runelite.api.*;
 import net.runelite.api.events.BeforeRender;
-import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.events.PluginChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.PluginManager;
 
 import javax.inject.Inject;
-import java.util.Objects;
 
 @PluginDescriptor(
 	name = "HD Minimap",
@@ -62,11 +58,6 @@ public class HDMinimapPlugin extends Plugin
 
 	private final int[] tmpScreenX = new int[6];
 	private final int[] tmpScreenY = new int[6];
-
-	public boolean useHDMinimap = false;
-
-	private final String HD_KEY = "117 HD";
-
 	static int blend(int var0, int var1)
 	{
 		var1 = (var0 & 127) * var1 >> 7;

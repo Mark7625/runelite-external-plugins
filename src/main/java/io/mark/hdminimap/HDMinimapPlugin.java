@@ -28,12 +28,14 @@ package io.mark.hdminimap;
 import net.runelite.api.*;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PluginChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.PluginManager;
 
 import javax.inject.Inject;
+import java.util.Objects;
 
 @PluginDescriptor(
 	name = "HD Minimap",
@@ -44,6 +46,7 @@ import javax.inject.Inject;
 public class HDMinimapPlugin extends Plugin
 {
 
+
 	@Inject
 	private Client client;
 
@@ -53,17 +56,13 @@ public class HDMinimapPlugin extends Plugin
 		client.setMinimapTileDrawer(this::drawTile);
 	}
 
-	@Override
-	protected void shutDown()
-	{
-		client.setMinimapTileDrawer(null);
-	}
-
 	@Inject
 	private PluginManager pluginManager;
 
 	private final int[] tmpScreenX = new int[6];
 	private final int[] tmpScreenY = new int[6];
+
+	public boolean useHDMinimap = false;
 
 	private final String HD_KEY = "117 HD";
 
@@ -75,25 +74,27 @@ public class HDMinimapPlugin extends Plugin
 		return (var0 & 0xFF80) + var1;
 	}
 
-	@Subscribe
+	@Subscribe // Default priority, run before 117 HD
 	public void onPluginChanged(PluginChanged event) {
-		if(event.getPlugin().getName().equals(HD_KEY)) {
-			if (!event.isLoaded()) {
-				client.setMinimapTileDrawer(this::drawTile);
-			}
-		}
+		applyMinimapChanges();
 	}
 
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged) {
-		if (gameStateChanged.getGameState() == GameState.LOGGING_IN) {
-			if (pluginManager.getPlugins().stream().anyMatch(it -> it.getName().equals(HD_KEY))) {
-				Plugin hdMinimapPlugin = pluginManager.getPlugins().stream().filter( it -> it.getName().equals(HD_KEY)).findFirst().get();
-				if (!pluginManager.isPluginEnabled(hdMinimapPlugin)) {
-					client.setMinimapTileDrawer(this::drawTile);
-				}
-			}
-		}
+	@Subscribe // Default priority, run before 117 HD
+	public void onConfigChanged(ConfigChanged event) {
+		applyMinimapChanges();
+	}
+
+	@Override
+	public void shutDown() {
+		client.setMinimapTileDrawer(null);
+	}
+
+	private void applyMinimapChanges() {
+		// Let other plugins decide, after we've reset the map in shutDown()
+		if (!pluginManager.isPluginEnabled(this))
+			return;
+
+		client.setMinimapTileDrawer(this::drawTile);
 	}
 
 	private void drawTile(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1)

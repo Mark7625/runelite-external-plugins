@@ -1,4 +1,4 @@
-package io.mark.hdminimap;
+package io.mark.minimap;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.RuneLite;
@@ -9,12 +9,12 @@ import java.io.InputStream;
 import java.util.Properties;
 
 @Slf4j
-public class HDMinimapPluginLauncher
+public class EnhancedMinimapPluginLauncher
 {
 	public static void main(String[] args) throws Exception
 	{
 		useLatestPluginHub();
-		ExternalPluginManager.loadBuiltin(HDMinimapPlugin.class);
+		ExternalPluginManager.loadBuiltin(EnhancedMinimapPlugin.class);
 		RuneLite.main(args);
 	}
 

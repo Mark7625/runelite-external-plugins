@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OSRS Style Stats</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Vertical stack of rows (no outer frame) */
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        /* Each stat row: left value box + right icon box */
+        .stat-row {
+            display: flex;
+            flex-direction: row;
+            height: 32px;
+            width: 100px;
+            gap: 3px;
+        }
+
+        /* Left: value box */
+        .value-box {
+            flex: 1;
+            background: #2a2416;
+            border: 1px solid #a9822d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-text {
+            color: #00ff00;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* Right: icon box with animated fill behind */
+        .icon-box {
+            position: relative;
+            width: 32px;
+            background: #2a2416;
+            border: 1px solid #a9822d;
+            overflow: visible;
+        }
+
+        .fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            transition: height 0.5s ease-in-out;
+            z-index: 0;
+        }
+
+        /* Base colors from Java constants */
+        .fill.hp { background: linear-gradient(to top, #e12300, #e12300); } /* HEALTH_COLOR */
+        .fill.prayer { background: linear-gradient(to top, #32c8c8, #32c8c8); } /* PRAYER_COLOR */
+        .fill.run { background: linear-gradient(to top, #c7ae00, #c7ae00); } /* ENERGY_COLOR */
+        .fill.spec { background: linear-gradient(to top, #039900, #039900); } /* SPECIAL_ATTACK_COLOR */
+        
+        /* Status effect colors - these override base colors */
+        .fill.hp.poisoned { background: linear-gradient(to top, #009100, #009100); } /* POISONED_COLOR */
+        .fill.hp.venomed { background: linear-gradient(to top, #004100, #004100); } /* VENOMED_COLOR */
+        .fill.hp.diseased { background: linear-gradient(to top, #ffc14b, #ffc14b); } /* DISEASE_COLOR */
+        .fill.hp.parasite { background: linear-gradient(to top, #c43e6d, #c43e6d); } /* PARASITE_COLOR */
+        
+        .fill.prayer.active { background: linear-gradient(to top, #39ffba, #39ffba); } /* ACTIVE_PRAYER_COLOR */
+        
+        .fill.run.stamina { background: linear-gradient(to top, #a07c48, #a07c48); } /* RUN_STAMINA_COLOR */
+        
+        /* Heal colors from Java constants */
+        .fill.hp.heal { background: linear-gradient(to top, #ff7006, #ff7006); } /* HEAL_COLOR */
+        .fill.prayer.heal { background: linear-gradient(to top, #39ffba, #39ffba); } /* PRAYER_HEAL_COLOR */
+        .fill.run.heal { background: linear-gradient(to top, #c77600, #c77600); } /* ENERGY_HEAL_COLOR */
+
+        .icon {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            margin: 4px;
+            z-index: 1;
+        }
+        
+        /* Status effect indicators */
+        .status-indicator {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid #fff;
+            z-index: 2;
+        }
+        
+        .status-indicator.poisoned { background: #009100; } /* POISONED_COLOR */
+        .status-indicator.venomed { background: #004100; } /* VENOMED_COLOR */
+        .status-indicator.diseased { background: #ffc14b; } /* DISEASE_COLOR */
+        .status-indicator.parasite { background: #c43e6d; } /* PARASITE_COLOR */
+        .status-indicator.prayer-active { background: #39ffba; } /* ACTIVE_PRAYER_COLOR */
+        .status-indicator.stamina-active { background: #a07c48; } /* RUN_STAMINA_COLOR */
+        
+        /* Tooltip styles */
+        .icon-box:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 10;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="panel">
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="hp-text">99</div></div>
+        <div class="icon-box" data-bar="hp">
+            <div class="fill hp" id="hp-fill"></div>
+            <img src="hp_icon.png" class="icon" alt="HP">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="prayer-text">99</div></div>
+        <div class="icon-box" data-bar="prayer">
+            <div class="fill prayer" id="prayer-fill"></div>
+            <img src="prayer_icon.png" class="icon" alt="Prayer">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="run-text">100</div></div>
+        <div class="icon-box" data-bar="run">
+            <div class="fill run" id="run-fill"></div>
+            <img src="run_icon.png" class="icon" id="run-icon" alt="Run">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="spec-text">100</div></div>
+        <div class="icon-box" data-bar="spec">
+            <div class="fill spec" id="spec-fill"></div>
+            <img src="spec_icon.png" class="icon" alt="Spec">
+        </div>
+    </div>
+</div>
+
+<script>
+    const fills = {
+        hp: document.getElementById("hp-fill"),
+        prayer: document.getElementById("prayer-fill"),
+        run: document.getElementById("run-fill"),
+        spec: document.getElementById("spec-fill"),
+    };
+
+    const texts = {
+        hp: document.getElementById("hp-text"),
+        prayer: document.getElementById("prayer-text"),
+        run: document.getElementById("run-text"),
+        spec: document.getElementById("spec-text"),
+    };
+
+    const eventSource = new EventSource("/sse");
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        // Update HP bar with status effects
+        const hpPercent = data.maxHp > 0 ? (data.hp / data.maxHp) * 100 : 0;
+        fills.hp.style.height = hpPercent + "%";
+        texts.hp.textContent = data.hp;
+        
+        // Apply status effect colors to HP bar
+        fills.hp.className = "fill hp";
+        let hpTooltip = `HP: ${data.hp}/${data.maxHp}`;
+        if (data.poisonState >= 1000000) {
+            fills.hp.classList.add("venomed");
+            hpTooltip += " (Venomed)";
+        } else if (data.poisonState > 0) {
+            fills.hp.classList.add("poisoned");
+            hpTooltip += " (Poisoned)";
+        } else if (data.diseaseState > 0) {
+            fills.hp.classList.add("diseased");
+            hpTooltip += " (Diseased)";
+        } else if (data.parasiteState >= 1) {
+            fills.hp.classList.add("parasite");
+            hpTooltip += " (Parasite)";
+        }
+        document.querySelector('.icon-box[data-bar="hp"]').setAttribute('data-tooltip', hpTooltip);
+        
+        // Update Prayer bar
+        const prayerPercent = data.maxPrayer > 0 ? (data.prayer / data.maxPrayer) * 100 : 0;
+        fills.prayer.style.height = prayerPercent + "%";
+        texts.prayer.textContent = data.prayer;
+        
+        // Apply prayer status color
+        fills.prayer.className = "fill prayer";
+        let prayerTooltip = `Prayer: ${data.prayer}/${data.maxPrayer}`;
+        if (data.hasActivePrayer) {
+            fills.prayer.classList.add("active");
+            prayerTooltip += " (Active)";
+        }
+        document.querySelector('.icon-box[data-bar="prayer"]').setAttribute('data-tooltip', prayerTooltip);
+        
+        // Update Run Energy bar
+        const runPercent = data.maxRunEnergy > 0 ? (data.runEnergy / data.maxRunEnergy) * 100 : 0;
+        fills.run.style.height = runPercent + "%";
+        texts.run.textContent = data.runEnergy;
+        
+        // Apply stamina status color and change icon
+        fills.run.className = "fill run";
+        let runTooltip = `Run Energy: ${data.runEnergy}/${data.maxRunEnergy}`;
+        const runIcon = document.getElementById("run-icon");
+        
+        // First check if runActive is true, if so use active icon
+        if (data.runActive) {
+            runIcon.src = "run_icon_active.png";
+            runTooltip += " (Run Active)";
+        } else if (data.staminaActive) {
+            // If runActive is false but stamina is active, show stamina icon
+            fills.run.classList.add("stamina");
+            runIcon.src = "run_icon_active.png";
+            runTooltip += " (Stamina Active)";
+        } else {
+            // Neither runActive nor stamina active, show normal icon
+            runIcon.src = "run_icon.png";
+        }
+        document.querySelector('.icon-box[data-bar="run"]').setAttribute('data-tooltip', runTooltip);
+        
+        // Update Special Attack bar
+        const specPercent = data.maxSpecialAttack > 0 ? (data.specialAttack / data.maxSpecialAttack) * 100 : 0;
+        fills.spec.style.height = specPercent + "%";
+        texts.spec.textContent = data.specialAttack;
+        
+        let specTooltip = `Special Attack: ${data.specialAttack}/${data.maxSpecialAttack}`;
+        document.querySelector('.icon-box[data-bar="spec"]').setAttribute('data-tooltip', specTooltip);
+    };
+
+    window.addEventListener("beforeunload", () => eventSource.close());
+</script>
+</body>
+</html>

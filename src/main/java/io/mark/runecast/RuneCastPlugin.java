@@ -2,12 +2,12 @@ package io.mark.runecast;
 
 import com.google.inject.Provides;
 import io.mark.runecast.gui.RuneCastSidebar;
-import io.mark.runecast.gui.components.ResourcePackPanel;
+import io.mark.runecast.pages.PageRegistry;
+import io.mark.runecast.pages.impl.StatusBars;
 import io.mark.runecast.resourcepacks.ResourcePackManager;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
-import net.runelite.api.Skill;
 import net.runelite.api.events.ClientTick;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
@@ -20,7 +20,6 @@ import net.runelite.client.ui.ClientToolbar;
 import javax.inject.Inject;
 import javax.swing.*;
 import java.awt.*;
-import java.util.Random;
 
 @PluginDescriptor(
 	name = "RuneCast OBS",
@@ -53,6 +52,12 @@ public class RuneCastPlugin extends Plugin
 	@Inject
 	private ClientToolbar clientToolbar;
 
+	@Inject
+	private StatusBars statusBars;
+
+	@Inject
+	private PageRegistry pageRegistry;
+
 	private HttpServer httpServer;
     private SSEManager sseManager;
 
@@ -66,10 +71,18 @@ public class RuneCastPlugin extends Plugin
 	protected void startUp()
 	{
 		resourcePackManager.startUp();
+		
+		// Register all pages with the PageRegistry
+		pageRegistry.registerPage(statusBars);
+
 		if (config.enableHttpServer()) {
             PageManager pageManager = new PageManager(config, resourcePackManager);
-			sseManager = new SSEManager(config);
-			httpServer = new HttpServer(pageManager, sseManager, config.httpPort());
+			sseManager = new SSEManager(config,pageRegistry);
+
+			
+			httpServer = new HttpServer(pageManager, sseManager, config.httpPort(),pageRegistry);
+
+			statusBars.init(sseManager);
 			
 			sseManager.start();
 			httpServer.start();
@@ -96,16 +109,9 @@ public class RuneCastPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onClientTick(ClientTick clientTick)
-	{
-		Player localPlayer = client.getLocalPlayer();
-		if (localPlayer != null && sseManager != null)
-		{
-			int newHp = new Random().nextInt(99) + 1;
-			int newMaxHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
-			sseManager.updateHp(newHp, newMaxHp);
-			sseManager.forceUpdate();
-		}
+	public void onClientTick(ClientTick clientTick) {
+		pageRegistry.updateAllPages();
+		statusBars.onGameTick();
 	}
 
 }

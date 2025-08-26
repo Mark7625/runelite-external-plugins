@@ -1,5 +1,6 @@
 package io.mark.runecast;
 
+import io.mark.runecast.pages.PageRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -12,22 +13,21 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.gson.Gson;
-import net.runelite.client.RuneLite;
 
 public class SSEManager {
     private final RuneCastConfig config;
+    private final PageRegistry pageRegistry;
     private final ConcurrentHashMap<Socket, OutputStream> activeConnections = new ConcurrentHashMap<>();
     private final ScheduledExecutorService updateExecutor;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final Gson gson = new Gson();
 
-    private int currentHp = 99;
-    private int maxHp = 99;
-
-    public SSEManager(RuneCastConfig config) {
+    public SSEManager(RuneCastConfig config,PageRegistry pageRegistry) {
         this.config = config;
+        this.pageRegistry = pageRegistry;
         this.updateExecutor = Executors.newScheduledThreadPool(1);
     }
+
     
     public void start() {
         if (running.get()) {
@@ -40,7 +40,7 @@ public class SSEManager {
             if (running.get()) {
                 broadcastUpdate();
             }
-        }, 0, config.refreshRate(), TimeUnit.MILLISECONDS);
+        }, 0, 1, TimeUnit.MILLISECONDS);
     }
     
     public void stop() {
@@ -148,16 +148,19 @@ public class SSEManager {
     
     private String createUpdateData() {
         Map<String, Object> data = new HashMap<>();
-        data.put("hp", currentHp);
-        data.put("maxHp", maxHp);
-        data.put("showHpBar", config.showHpBar());
+
+        if (pageRegistry != null) {
+            Map<String, Map<String, Object>> allPageData = pageRegistry.getAllPageData();
+            for (Map.Entry<String, Map<String, Object>> pageEntry : allPageData.entrySet()) {
+                Map<String, Object> pageData = pageEntry.getValue();
+                for (Map.Entry<String, Object> dataEntry : pageData.entrySet()) {
+                    String key = dataEntry.getKey();
+                    data.put(key, dataEntry.getValue());
+                }
+            }
+        }
 
         return gson.toJson(data);
-    }
-    
-    public void updateHp(int current, int max) {
-        this.currentHp = current;
-        this.maxHp = max;
     }
 
     public void forceUpdate() {

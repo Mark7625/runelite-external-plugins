@@ -1,5 +1,8 @@
 package io.mark.runecast;
 
+import io.mark.runecast.pages.PageRegistry;
+
+import javax.inject.Inject;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -19,10 +22,12 @@ public class HttpServer {
     private ExecutorService serverExecutor;
     private ExecutorService clientExecutor;
     private final AtomicBoolean serverRunning = new AtomicBoolean(false);
+    private PageRegistry pageRegistry;
 
-    public HttpServer(PageManager pageManager, SSEManager sseManager, int port) {
+    public HttpServer(PageManager pageManager, SSEManager sseManager, int port, PageRegistry pageRegistry) {
         this.pageManager = pageManager;
         this.sseManager = sseManager;
+        this.pageRegistry = pageRegistry;
         this.port = port;
     }
 
@@ -91,18 +96,20 @@ public class HttpServer {
                     case "/sse":
                         sseManager.handleSSERequest(clientSocket);
                         break;
-                    case "/hp":
-                        sendPageResponse(clientSocket, "hp");
-                        break;
                     case "/debug":
                         sendDebugResponse(clientSocket);
                         break;
                     default:
-                        // Check if this is an asset request (images, CSS, JS, etc.)
-                        if (isAssetRequest(path)) {
-                            sendAssetResponse(clientSocket, path);
+                       String name = path.replace("/","");
+
+                        if (pageRegistry.isPageRegistered(name)) {
+                            sendPageResponse(clientSocket,name);
                         } else {
-                            send404Response(clientSocket);
+                            if (isAssetRequest(path)) {
+                                sendAssetResponse(clientSocket, path);
+                            } else {
+                                send404Response(clientSocket);
+                            }
                         }
                         break;
                 }

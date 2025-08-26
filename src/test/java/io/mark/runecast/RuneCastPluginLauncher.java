@@ -1,13 +1,13 @@
-package io.mark.f2p;
+package io.mark.runecast;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class F2pPluginLauncher
+public class RuneCastPluginLauncher
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(F2pPlugin.class);
+		ExternalPluginManager.loadBuiltin(RuneCastPlugin.class);
 		RuneLite.main(args);
 	}
 }

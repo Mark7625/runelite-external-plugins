@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OSRS Style Stats</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Vertical stack of rows (no outer frame) */
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        /* Each stat row: left value box + right icon box */
+        .stat-row {
+            display: flex;
+            flex-direction: row;
+            height: 32px;
+            width: 100px;
+            gap: 3px;
+        }
+
+        /* Left: value box */
+        .value-box {
+            flex: 1;
+            background: #2a2416;
+            border: 1px solid #a9822d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-text {
+            color: #00ff00;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* Right: icon box with animated fill behind */
+        .icon-box {
+            position: relative;
+            width: 32px;
+            background: #2a2416;
+            border: 1px solid #a9822d;
+            overflow: hidden;
+        }
+
+        .fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            transition: height 0.5s ease-in-out;
+            z-index: 0;
+        }
+
+        .fill.hp { background: linear-gradient(to top, #7f0000, #ff0000); }
+        .fill.prayer { background: linear-gradient(to top, #0044aa, #00aaff); }
+        .fill.run { background: linear-gradient(to top, #999900, #ffff00); }
+        .fill.spec { background: linear-gradient(to top, #006600, #00ff00); }
+
+        .icon {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            margin: 4px;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+<div class="panel">
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="hp-text">99</div></div>
+        <div class="icon-box">
+            <div class="fill hp" id="hp-fill"></div>
+            <img src="hp_icon.png" class="icon" alt="HP">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="prayer-text">99</div></div>
+        <div class="icon-box">
+            <div class="fill prayer" id="prayer-fill"></div>
+            <img src="prayer_icon.png" class="icon" alt="Prayer">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="run-text">100</div></div>
+        <div class="icon-box">
+            <div class="fill run" id="run-fill"></div>
+            <img src="run_icon.png" class="icon" alt="Run">
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="value-box"><div class="stat-text" id="spec-text">100</div></div>
+        <div class="icon-box">
+            <div class="fill spec" id="spec-fill"></div>
+            <img src="spec_icon.png" class="icon" alt="Spec">
+        </div>
+    </div>
+</div>
+
+<script>
+    const fills = {
+        hp: document.getElementById("hp-fill"),
+        prayer: document.getElementById("prayer-fill"),
+        run: document.getElementById("run-fill"),
+        spec: document.getElementById("spec-fill"),
+    };
+
+    const texts = {
+        hp: document.getElementById("hp-text"),
+        prayer: document.getElementById("prayer-text"),
+        run: document.getElementById("run-text"),
+        spec: document.getElementById("spec-text"),
+    };
+
+    const eventSource = new EventSource("/sse");
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const percent = data.maxHp > 0 ? (data.hp / data.maxHp) * 100 : 0;
+
+        Object.values(fills).forEach(f => f.style.height = percent + "%");
+        Object.values(texts).forEach(t => t.textContent = data.hp);
+    };
+
+    window.addEventListener("beforeunload", () => eventSource.close());
+</script>
+</body>
+</html>

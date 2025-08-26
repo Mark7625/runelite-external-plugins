@@ -12,6 +12,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.gson.Gson;
+import net.runelite.client.RuneLite;
 
 public class SSEManager {
     private final RuneCastConfig config;

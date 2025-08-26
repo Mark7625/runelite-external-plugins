@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -93,8 +94,16 @@ public class HttpServer {
                     case "/hp":
                         sendPageResponse(clientSocket, "hp");
                         break;
+                    case "/debug":
+                        sendDebugResponse(clientSocket);
+                        break;
                     default:
-                        send404Response(clientSocket);
+                        // Check if this is an asset request (images, CSS, JS, etc.)
+                        if (isAssetRequest(path)) {
+                            sendAssetResponse(clientSocket, path);
+                        } else {
+                            send404Response(clientSocket);
+                        }
                         break;
                 }
             } else {
@@ -147,6 +156,20 @@ public class HttpServer {
         out.flush();
     }
 
+    private void sendJsonResponse(Socket clientSocket, String json) throws IOException {
+        String response = "HTTP/1.1 200 OK\r\n" +
+                         "Content-Type: application/json\r\n" +
+                         "Content-Length: " + json.getBytes(StandardCharsets.UTF_8).length + "\r\n" +
+                         "Access-Control-Allow-Origin: *\r\n" +
+                         "Connection: close\r\n" +
+                         "\r\n" +
+                         json;
+        
+        OutputStream out = clientSocket.getOutputStream();
+        out.write(response.getBytes(StandardCharsets.UTF_8));
+        out.flush();
+    }
+
     private void send404Response(Socket clientSocket) throws IOException {
         String response = "HTTP/1.1 404 Not Found\r\n" +
                          "Content-Type: text/plain\r\n" +
@@ -154,6 +177,63 @@ public class HttpServer {
                          "Connection: close\r\n" +
                          "\r\n" +
                          "Page not found";
+        
+        OutputStream out = clientSocket.getOutputStream();
+        out.write(response.getBytes(StandardCharsets.UTF_8));
+        out.flush();
+    }
+    
+    private boolean isAssetRequest(String path) {
+        if (path == null || path.equals("/")) return false;
+        
+        String lowerPath = path.toLowerCase();
+        return lowerPath.endsWith(".png") || 
+               lowerPath.endsWith(".jpg") || 
+               lowerPath.endsWith(".jpeg") || 
+               lowerPath.endsWith(".gif") || 
+               lowerPath.endsWith(".svg") || 
+               lowerPath.endsWith(".css") || 
+               lowerPath.endsWith(".js") || 
+               lowerPath.endsWith(".ico") || 
+               lowerPath.endsWith(".woff") || 
+               lowerPath.endsWith(".woff2") || 
+               lowerPath.endsWith(".ttf") || 
+               lowerPath.endsWith(".eot");
+    }
+    
+    private void sendAssetResponse(Socket clientSocket, String assetPath) throws IOException {
+        // Remove leading slash
+        String cleanPath = assetPath.startsWith("/") ? assetPath.substring(1) : assetPath;
+        
+        byte[] assetData = pageManager.getAsset(cleanPath);
+        if (assetData != null) {
+            String mimeType = pageManager.getAssetMimeType(cleanPath);
+            String response = "HTTP/1.1 200 OK\r\n" +
+                             "Content-Type: " + mimeType + "\r\n" +
+                             "Content-Length: " + assetData.length + "\r\n" +
+                             "Access-Control-Allow-Origin: *\r\n" +
+                             "Cache-Control: public, max-age=31536000\r\n" +
+                             "Connection: keep-alive\r\n" +
+                         "\r\n";
+            
+            OutputStream out = clientSocket.getOutputStream();
+            out.write(response.getBytes(StandardCharsets.UTF_8));
+            out.write(assetData);
+            out.flush();
+        } else {
+            send404Response(clientSocket);
+        }
+    }
+    
+    private void sendDebugResponse(Socket clientSocket) throws IOException {
+        String debugInfo = pageManager.getAvailableAssetsDebug();
+        String response = "HTTP/1.1 200 OK\r\n" +
+                         "Content-Type: text/plain; charset=UTF-8\r\n" +
+                         "Content-Length: " + debugInfo.getBytes(StandardCharsets.UTF_8).length + "\r\n" +
+                         "Access-Control-Allow-Origin: *\r\n" +
+                         "Connection: close\r\n" +
+                         "\r\n" +
+                         debugInfo;
         
         OutputStream out = clientSocket.getOutputStream();
         out.write(response.getBytes(StandardCharsets.UTF_8));

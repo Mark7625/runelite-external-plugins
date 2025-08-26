@@ -61,4 +61,16 @@ public interface RuneCastConfig extends Config
 	{
 		return 10;
 	}
+
+	@ConfigItem(
+			keyName = "resourcePacks",
+			name = "Resource Packs",
+			description = "Comma-separated list of resource packs to use in order of priority (e.g., PACK_A,PACK_B)",
+			section = obsSettings,
+			position = 8
+	)
+	default String resourcePacks()
+	{
+		return "";
+	}
 }

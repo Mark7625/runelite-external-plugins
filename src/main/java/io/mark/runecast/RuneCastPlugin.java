@@ -1,6 +1,9 @@
 package io.mark.runecast;
 
 import com.google.inject.Provides;
+import io.mark.runecast.gui.RuneCastSidebar;
+import io.mark.runecast.gui.components.ResourcePackPanel;
+import io.mark.runecast.resourcepacks.ResourcePackManager;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
@@ -12,8 +15,10 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
 
 import javax.inject.Inject;
+import javax.swing.*;
 import java.awt.*;
 import java.util.Random;
 
@@ -45,36 +50,49 @@ public class RuneCastPlugin extends Plugin
 	@Inject
 	private ClientThread clientThread;
 
+	@Inject
+	private ClientToolbar clientToolbar;
+
 	private HttpServer httpServer;
-	private PageManager pageManager;
-	private SSEManager sseManager;
+    private SSEManager sseManager;
+
+	@Inject
+	private ResourcePackManager resourcePackManager;
+
+	@Getter
+	private RuneCastSidebar sidebar;
 
 	@Override
 	protected void startUp()
 	{
-		if (config.enableHttpServer())
-		{
-			pageManager = new PageManager(config);
+		resourcePackManager.startUp();
+		if (config.enableHttpServer()) {
+            PageManager pageManager = new PageManager(config, resourcePackManager);
 			sseManager = new SSEManager(config);
 			httpServer = new HttpServer(pageManager, sseManager, config.httpPort());
 			
 			sseManager.start();
 			httpServer.start();
-			
-			notifier.notify("RuneCast OBS - HTTP server started at: http://localhost:" + config.httpPort() + "/hp", TrayIcon.MessageType.INFO);
-			System.out.println("http://localhost:" + config.httpPort() + "/hp");
+			String packsInfo = config.resourcePacks().isEmpty() ? " (default theme)" : " with resource packs: " + config.resourcePacks();
+			notifier.notify("RuneCast - HTTP server started at: http://localhost:" + config.httpPort() + "/hp" + packsInfo, TrayIcon.MessageType.INFO);
 		}
+		SwingUtilities.invokeLater(() -> sidebar = injector.getInstance(RuneCastSidebar.class));
 	}
 
 	@Override
 	public void shutDown()
 	{
+		if (sidebar != null)
+			sidebar.destroy();
+		sidebar = null;
+
 		if (httpServer != null) {
 			httpServer.stop();
 		}
 		if (sseManager != null) {
 			sseManager.stop();
 		}
+		resourcePackManager.shutDown();
 	}
 
 	@Subscribe
@@ -89,4 +107,5 @@ public class RuneCastPlugin extends Plugin
 			sseManager.forceUpdate();
 		}
 	}
+
 }

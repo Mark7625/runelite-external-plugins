@@ -81,6 +81,10 @@ public class HDMinimapPlugin extends Plugin
 		client.getRasterizer().setRasterGouraudLowRes(false);
 		try
 		{
+            if (tile == null) {
+
+                return;
+            }
 			SceneTilePaint paint = tile.getSceneTilePaint();
 			if (paint != null)
 			{

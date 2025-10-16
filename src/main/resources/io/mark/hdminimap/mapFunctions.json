@@ -1,0 +1,931 @@
+[
+  {
+    "category": "Agility shortcut",
+    "objects": [
+      17030,
+      39189
+    ]
+  },
+  {
+    "category": "Agility training",
+    "objects": [
+      775
+    ]
+  },
+  {
+    "category": "Altar",
+    "objects": [
+      2752,
+      36366,
+      39223,
+      42429,
+      43881,
+      54058,
+      34945
+    ]
+  },
+  {
+    "category": "Anvil",
+    "objects": [
+      2743,
+      39218,
+      52381
+    ]
+  },
+  {
+    "category": "Apothecary",
+    "objects": [
+      2761
+    ]
+  },
+  {
+    "category": "Bank",
+    "objects": [
+      2738,
+      11983,
+      38622,
+      39224,
+      52972
+    ]
+  },
+  {
+    "category": "Bird house site",
+    "objects": [
+      30161
+    ]
+  },
+  {
+    "category": "Bounty Hunter trader",
+    "objects": [
+      673
+    ]
+  },
+  {
+    "category": "Brewery",
+    "objects": [
+      8723
+    ]
+  },
+  {
+    "category": "Clan Hub",
+    "objects": [
+      41616
+    ]
+  },
+  {
+    "category": "Combat Achievements",
+    "objects": [
+      42514
+    ]
+  },
+  {
+    "category": "Combat training",
+    "objects": [
+      2744
+    ]
+  },
+  {
+    "category": "Cooking range",
+    "objects": [
+      2772,
+      39213,
+      42522,
+      50192,
+      52383
+    ]
+  },
+  {
+    "category": "Dairy churn",
+    "objects": [
+      10095
+    ]
+  },
+  {
+    "category": "Dairy cow",
+    "objects": [
+      33171
+    ]
+  },
+  {
+    "category": "Death\u0027s Office",
+    "objects": [
+      39619
+    ]
+  },
+  {
+    "category": "Distraction \u0026 Diversion",
+    "objects": [
+      41232
+    ]
+  },
+  {
+    "category": "Dungeon",
+    "objects": [
+      2745,
+      36050,
+      36153,
+      39214,
+      14108,
+      52322,
+      52971
+    ]
+  },
+  {
+    "category": "Dye trader",
+    "objects": [
+      33172
+    ]
+  },
+  {
+    "category": "Estate Agent",
+    "objects": [
+      15532
+    ]
+  },
+  {
+    "category": "Fairy Rings",
+    "objects": [
+      13486,
+      13487,
+      13488,
+      13489,
+      13490,
+      27779,
+      31977,
+      40963,
+      56163,
+      56164,
+      56165,
+      56166,
+      56167,
+      56168,
+      56169,
+      56170,
+      56171,
+      56172,
+      56173,
+      56174,
+      56175,
+      56176,
+      56177,
+      56178,
+      56179,
+      56180,
+      56181,
+      56182,
+      56183,
+      56184,
+      56185,
+      56186,
+      56187,
+      56188,
+      56189,
+      56190,
+      56191,
+      56192,
+      56193,
+      56194,
+      56195,
+      56196,
+      56197,
+      56198,
+      56199,
+      56200,
+      56201,
+      56202,
+      56203,
+      56204,
+      56205,
+      56206,
+      56207,
+      56208,
+      56209,
+      56210,
+      56211,
+      56212,
+      56213,
+      56214,
+      56215,
+      56216,
+      56217,
+      56218
+    ]
+  },
+  {
+    "category": "Farming patch",
+    "objects": [
+      8719
+    ]
+  },
+  {
+    "category": "Fishing spot",
+    "objects": [
+      2759
+    ]
+  },
+  {
+    "category": "Fur trader",
+    "objects": [
+      2779
+    ]
+  },
+  {
+    "category": "Furnace",
+    "objects": [
+      2742,
+      39216
+    ]
+  },
+  {
+    "category": "Garden supplier",
+    "objects": [
+      33173
+    ]
+  },
+  {
+    "category": "Grand Exchange",
+    "objects": [
+      16458
+    ]
+  },
+  {
+    "category": "Grindstone",
+    "objects": [
+      43855
+    ]
+  },
+  {
+    "category": "Hairdresser",
+    "objects": [
+      5119
+    ]
+  },
+  {
+    "category": "Herbalist",
+    "objects": [
+      2753
+    ]
+  },
+  {
+    "category": "Holiday event",
+    "objects": [
+      20132,
+      47178
+    ]
+  },
+  {
+    "category": "Holiday item trader",
+    "objects": [
+      33166
+    ]
+  },
+  {
+    "category": "House portal",
+    "objects": [
+      15531
+    ]
+  },
+  {
+    "category": "Hunter training",
+    "objects": [
+      19750
+    ]
+  },
+  {
+    "category": "Junk checker",
+    "objects": [
+      33168
+    ]
+  },
+  {
+    "category": "Loom",
+    "objects": [
+      8722
+    ]
+  },
+  {
+    "category": "Makeover Mage",
+    "objects": [
+      5120
+    ]
+  },
+  {
+    "category": "Minigame",
+    "objects": [
+      738,
+      11985,
+      36051,
+      36154,
+      38621,
+      50054,
+      50062,
+      50904
+    ]
+  },
+  {
+    "category": "Mining site",
+    "objects": [
+      2741,
+      38100
+    ]
+  },
+  {
+    "category": "Newspaper trader",
+    "objects": [
+      33169
+    ]
+  },
+  {
+    "category": "Polishing wheel",
+    "objects": [
+      43856
+    ]
+  },
+  {
+    "category": "Poll booth",
+    "objects": [
+      26301,
+      39225
+    ]
+  },
+  {
+    "category": "Pottery wheel",
+    "objects": [
+      2774,
+      39226
+    ]
+  },
+  {
+    "category": "Pricing expert",
+    "objects": [
+      16459,
+      16460,
+      16461,
+      16462,
+      16463
+    ]
+  },
+  {
+    "category": "Pub",
+    "objects": [
+      2764,
+      39222
+    ]
+  },
+  {
+    "category": "Quest",
+    "objects": [
+      42651,
+      42652,
+      42653,
+      42654,
+      42655,
+      42656,
+      42657,
+      42658,
+      42659,
+      42660,
+      42661,
+      42662,
+      42663,
+      42664,
+      42665,
+      42666,
+      42667,
+      42668,
+      42669,
+      42670,
+      42671,
+      42672,
+      42673,
+      42674,
+      42675,
+      42676,
+      42677,
+      42678,
+      42679,
+      42680,
+      42681,
+      42682,
+      42683,
+      42684,
+      42685,
+      42686,
+      42687,
+      42688,
+      42689,
+      42690,
+      42691,
+      42692,
+      42693,
+      42694,
+      42695,
+      42696,
+      42697,
+      42698,
+      42699,
+      42700,
+      42701,
+      42702,
+      42703,
+      42704,
+      42705,
+      42706,
+      42707,
+      42708,
+      42709,
+      42710,
+      42711,
+      42712,
+      42713,
+      42714,
+      42715,
+      42716,
+      42717,
+      42718,
+      42719,
+      42720,
+      42721,
+      42722,
+      42723,
+      42724,
+      42725,
+      42726,
+      42727,
+      42728,
+      42729,
+      42730,
+      42731,
+      42732,
+      42733,
+      42734,
+      42735,
+      42736,
+      42737,
+      42738,
+      42739,
+      42740,
+      42741,
+      42742,
+      42743,
+      42744,
+      42745,
+      42746,
+      42747,
+      42748,
+      42749,
+      42750,
+      42751,
+      42752,
+      42753,
+      42754,
+      42755,
+      42756,
+      42757,
+      42758,
+      42759,
+      42760,
+      42761,
+      42762,
+      42763,
+      42764,
+      42765,
+      42766,
+      42767,
+      42768,
+      42769,
+      42770,
+      42771,
+      42772,
+      42773,
+      42774,
+      42775,
+      42776,
+      42777,
+      42778,
+      42779,
+      42780,
+      42781,
+      42782,
+      42783,
+      42784,
+      42785,
+      42786,
+      42787,
+      42788,
+      42789,
+      42790,
+      42791,
+      42792,
+      42793,
+      42794,
+      42795,
+      42796,
+      42797,
+      42798,
+      42799,
+      42800,
+      43461,
+      43823,
+      44067,
+      44618,
+      46419,
+      46814,
+      47353,
+      49907,
+      50058,
+      50651,
+      50882,
+      50883,
+      50884,
+      50885,
+      53264,
+      54685,
+      54686,
+      54687,
+      54688,
+      55776,
+      56411,
+      56412,
+      56413,
+      56414,
+      56415
+    ]
+  },
+  {
+    "category": "Raid",
+    "objects": [
+      46200,
+      46201
+    ]
+  },
+  {
+    "category": "Rare trees",
+    "objects": [
+      2767,
+      39227
+    ]
+  },
+  {
+    "category": "Rope trader",
+    "objects": [
+      33174
+    ]
+  },
+  {
+    "category": "Sandpit",
+    "objects": [
+      20989
+    ]
+  },
+  {
+    "category": "Sawmill",
+    "objects": [
+      15533
+    ]
+  },
+  {
+    "category": "Silk trader",
+    "objects": [
+      2762
+    ]
+  },
+  {
+    "category": "Singing bowl",
+    "objects": [
+      34946
+    ]
+  },
+  {
+    "category": "Slayer Master",
+    "objects": [
+      5118
+    ]
+  },
+  {
+    "category": "Spinning wheel",
+    "objects": [
+      2768
+    ]
+  },
+  {
+    "category": "Stagnant water source",
+    "objects": [
+      10176
+    ]
+  },
+  {
+    "category": "Stonemason",
+    "objects": [
+      15534
+    ]
+  },
+  {
+    "category": "Tannery",
+    "objects": [
+      2766
+    ]
+  },
+  {
+    "category": "Task Master",
+    "objects": [
+      23590,
+      34317
+    ]
+  },
+  {
+    "category": "Taxidermist",
+    "objects": [
+      33175
+    ]
+  },
+  {
+    "category": "Tea trader",
+    "objects": [
+      33170
+    ]
+  },
+  {
+    "category": "Thieving activity",
+    "objects": [
+      50830
+    ]
+  },
+  {
+    "category": "Transportation",
+    "objects": [
+      7389,
+      30090,
+      32989,
+      34980,
+      36659
+    ]
+  },
+  {
+    "category": "Trip Hammer",
+    "objects": [
+      43854
+    ]
+  },
+  {
+    "category": "Tutors",
+    "objects": [
+      2238,
+      33150,
+      33151,
+      33152,
+      33153,
+      33154,
+      33155,
+      33156,
+      33157,
+      33158,
+      33159,
+      33160,
+      33161,
+      33162,
+      33163,
+      33164,
+      33165,
+      37440,
+      37490,
+      42650
+    ]
+  },
+  {
+    "category": "Vale totem site",
+    "objects": [
+      56408
+    ]
+  },
+  {
+    "category": "Water source",
+    "objects": [
+      2771,
+      9678,
+      10462,
+      39215,
+      42430,
+      42521,
+      50903,
+      52382,
+      57657
+    ]
+  },
+  {
+    "category": "Windmill",
+    "objects": [
+      2775
+    ]
+  },
+  {
+    "category": "Wine trader",
+    "objects": [
+      33167
+    ]
+  },
+  {
+    "category": "Woodcutting stump",
+    "objects": [
+      21655
+    ]
+  },
+  {
+    "category": "Amulet shop",
+    "objects": [
+      2740
+    ]
+  },
+  {
+    "category": "Archery shop",
+    "objects": [
+      2750,
+      41766,
+      57349
+    ]
+  },
+  {
+    "category": "Axe shop",
+    "objects": [
+      2736
+    ]
+  },
+  {
+    "category": "Candle shop",
+    "objects": [
+      2757,
+      39219
+    ]
+  },
+  {
+    "category": "Chainmail shop",
+    "objects": [
+      2777
+    ]
+  },
+  {
+    "category": "Clothes shop",
+    "objects": [
+      2760,
+      39221
+    ]
+  },
+  {
+    "category": "Crafting shop",
+    "objects": [
+      2756,
+      44546
+    ]
+  },
+  {
+    "category": "Farming shop",
+    "objects": [
+      8721
+    ]
+  },
+  {
+    "category": "Fishing shop",
+    "objects": [
+      2758
+    ]
+  },
+  {
+    "category": "Food shop",
+    "objects": [
+      2763,
+      2769,
+      39220,
+      2770,
+      4709
+    ]
+  },
+  {
+    "category": "Forestry shop",
+    "objects": [
+      47500
+    ]
+  },
+  {
+    "category": "Gem shop",
+    "objects": [
+      2755,
+      11984
+    ]
+  },
+  {
+    "category": "General store",
+    "objects": [
+      2733,
+      39217,
+      52379,
+      57348
+    ]
+  },
+  {
+    "category": "Helmet shop",
+    "objects": [
+      2737,
+      52380
+    ]
+  },
+  {
+    "category": "Hunter shop",
+    "objects": [
+      19751
+    ]
+  },
+  {
+    "category": "Jewellery shop",
+    "objects": [
+      2754
+    ]
+  },
+  {
+    "category": "Mace shop",
+    "objects": [
+      2765
+    ]
+  },
+  {
+    "category": "Magic shop",
+    "objects": [
+      2735,
+      11982
+    ]
+  },
+  {
+    "category": "Mining shop",
+    "objects": [
+      2776
+    ]
+  },
+  {
+    "category": "Pet shop",
+    "objects": [
+      26821
+    ]
+  },
+  {
+    "category": "Platebody shop",
+    "objects": [
+      2747
+    ]
+  },
+  {
+    "category": "Platelegs shop",
+    "objects": [
+      2748
+    ]
+  },
+  {
+    "category": "Plateskirt shop",
+    "objects": [
+      2773
+    ]
+  },
+  {
+    "category": "Scimitar shop",
+    "objects": [
+      2749
+    ]
+  },
+  {
+    "category": "Shield shop",
+    "objects": [
+      2751
+    ]
+  },
+  {
+    "category": "Silver shop",
+    "objects": [
+      2778
+    ]
+  },
+  {
+    "category": "Speedrunning shop",
+    "objects": [
+      46236
+    ]
+  },
+  {
+    "category": "Spice shop",
+    "objects": [
+      2780
+    ]
+  },
+  {
+    "category": "Staff shop",
+    "objects": [
+      2746
+    ]
+  },
+  {
+    "category": "Sword shop",
+    "objects": [
+      2734,
+      11981,
+      41765,
+      52973
+    ]
+  }
+]

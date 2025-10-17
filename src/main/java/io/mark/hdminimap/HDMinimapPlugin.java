@@ -28,6 +28,7 @@ package io.mark.hdminimap;
 import com.google.inject.Provides;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementType;
+import io.mark.hdminimap.render.MinimapStyle;
 import io.mark.hdminimap.render.impl.HDRenderer;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
@@ -70,6 +71,9 @@ public class HDMinimapPlugin extends Plugin
     @Inject
     private MapElementManager mapElementManager;
 
+
+    private MinimapStyle currentStyle;
+
     @Provides
     HDMinimapConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(HDMinimapConfig.class);
@@ -78,17 +82,13 @@ public class HDMinimapPlugin extends Plugin
     @Override
 	protected void startUp() {
         mapElementManager.start();
-        client.setMinimapTileDrawer(this::drawMapTile);
+        currentStyle = config.minimapStyle();
+        setMinimapDrawer();
         reloadGame();
 	}
 
 	@Inject
 	private PluginManager pluginManager;
-
-	@Subscribe
-    public void onBeforeRender(BeforeRender beforeRender) {
-        client.setMinimapTileDrawer(this::drawMapTile);
-    }
 
 	@Override
 	public void shutDown() {
@@ -101,10 +101,23 @@ public class HDMinimapPlugin extends Plugin
     @Subscribe
     public void onConfigChanged(ConfigChanged event) {
         if (event.getGroup().equals(HDMinimapConfig.CONFIG_GROUP)) {
-            if (mapElementManager.getAllCategories(MapElementType.MAP_FUNCTION).contains(event.getKey()) || mapElementManager.getAllCategories(MapElementType.MAP_ICON).contains(event.getKey())) {
+            if (Objects.equals(event.getKey(), "minimapStyle")) {
+                currentStyle = config.minimapStyle();
+                setMinimapDrawer();
+                log.debug("Minimap style changed to: {}", currentStyle);
+            } else if (mapElementManager.getAllCategories(MapElementType.MAP_FUNCTION).contains(event.getKey()) ||
+                    mapElementManager.getAllCategories(MapElementType.MAP_ICON).contains(event.getKey())) {
                 client.getObjectCompositionCache().reset();
                 reloadGame();
             }
+        }
+    }
+
+    public void setMinimapDrawer() {
+        if (currentStyle != MinimapStyle.DEFAULT) {
+            client.setMinimapTileDrawer(this::drawMapTile);
+        } else {
+            client.setMinimapTileDrawer(null);
         }
     }
 

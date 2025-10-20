@@ -1,6 +1,7 @@
 package io.mark.hdminimap.render.impl;
 
 import io.mark.hdminimap.render.MinimapRenderer;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 
 import javax.inject.Singleton;
@@ -8,6 +9,7 @@ import javax.inject.Singleton;
 import static io.mark.hdminimap.render.MinimapRenderUtils.blend;
 
 @Singleton
+@Slf4j
 public class HDRenderer extends MinimapRenderer {
 
     private static final int DEFAULT_COLOR = 12345678;
@@ -21,7 +23,7 @@ public class HDRenderer extends MinimapRenderer {
                 renderTileModel(tile, tx, ty, px0, py0, px1, py1);
             } catch (Exception e) {
                 client.getRasterizer().setRasterGouraudLowRes(true);
-                e.printStackTrace();
+                log.error("Minimap Tile Rendering", e);
             }
         }
     }

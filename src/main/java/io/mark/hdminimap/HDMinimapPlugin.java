@@ -194,6 +194,9 @@ public class HDMinimapPlugin extends Plugin {
         clientThread.invoke(() -> {
             if (client.getGameState() == GameState.LOGGED_IN) {
                 client.setGameState(GameState.LOADING);
+                if (client.getWorldMap().getWorldMapRenderer().isLoaded()) {
+                    client.getWorldMap().initializeWorldMap(client.getWorldMap().getWorldMapData());
+                }
             }
         });
     }

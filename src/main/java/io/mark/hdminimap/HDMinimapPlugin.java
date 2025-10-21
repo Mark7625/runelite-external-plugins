@@ -26,10 +26,20 @@
 package io.mark.hdminimap;
 
 import com.google.inject.Provides;
+import io.mark.hdminimap.mapelement.MapElementManager;
+import io.mark.hdminimap.mapelement.MapElementSetting;
+import io.mark.hdminimap.mapelement.MapElementType;
 import io.mark.hdminimap.render.MinimapStyle;
 import io.mark.hdminimap.render.impl.HDRenderer;
+import io.mark.hdminimap.ui.MinimapPanel;
+import lombok.AccessLevel;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.worldmap.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -37,8 +47,16 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Objects;
 
 @PluginDescriptor(
@@ -62,7 +80,21 @@ public class HDMinimapPlugin extends Plugin {
     @Inject
     private HDMinimapConfig config;
 
+    @Inject
+    private MapElementManager mapElementManager;
+
     private MinimapStyle currentStyle;
+
+    @Setter(AccessLevel.PACKAGE)
+    private MinimapPanel panel;
+
+    private NavigationButton button;
+
+    @Inject
+    private ClientToolbar clientToolbar;
+
+    private Double lastZoom = null;
+
 
     @Provides
     HDMinimapConfig provideConfig(ConfigManager configManager) {
@@ -71,19 +103,39 @@ public class HDMinimapPlugin extends Plugin {
 
     @Override
 	protected void startUp() {
+        clientThread.invoke((() -> {
+            mapElementManager.start();
+            panel = injector.getInstance(MinimapPanel.class);
+
+            final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
+
+            button = NavigationButton.builder()
+                    .tooltip("Enhanced Minimap")
+                    .icon(icon)
+                    .priority(3)
+                    .panel(panel)
+                    .build();
+
+            clientToolbar.addNavigation(button);
+        }));
+
         currentStyle = config.minimapStyle();
         setMinimapDrawer();
         reloadGame();
+        lastZoom = client.getMinimapZoom();
 	}
+
 
 	@Inject
 	private PluginManager pluginManager;
 
 	@Override
 	public void shutDown() {
+        clientToolbar.removeNavigation(button);
         client.setMinimapTileDrawer(null);
         client.getObjectCompositionCache().reset();
         reloadGame();
+        mapElementManager.clear();
 	}
 
     @Subscribe
@@ -95,6 +147,12 @@ public class HDMinimapPlugin extends Plugin {
                 log.debug("Minimap style changed to: {}", currentStyle);
             }
         }
+        if (event.getGroup().equals(MapElementManager.CONFIG_GROUP)) {
+            if (mapElementManager.isCategoryInCurrentArea(event.getKey())) {
+                client.getObjectCompositionCache().reset();
+                reloadGame();
+            }
+        }
     }
 
     public void setMinimapDrawer() {
@@ -102,6 +160,30 @@ public class HDMinimapPlugin extends Plugin {
             client.setMinimapTileDrawer(this::drawMapTile);
         } else {
             client.setMinimapTileDrawer(null);
+        }
+    }
+
+    @Subscribe
+    public void onGameTick(GameTick gameTick) {
+        double zoom = client.getMinimapZoom();
+        if (lastZoom != zoom) {
+            lastZoom = zoom;
+
+            for (String category : mapElementManager.getCurrentAreaCategories()) {
+                MapElementSetting setting = mapElementManager.getSetting(category);
+                if (setting.isDisabled() && setting.getScale() != null) {
+                    client.getObjectCompositionCache().reset();
+                    reloadGame();
+                    return;
+                }
+            }
+        }
+    }
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged stateChanged) {
+        if (stateChanged.getGameState() == GameState.LOGGED_IN) {
+            mapElementManager.updateIcons();
         }
     }
 
@@ -130,6 +212,5 @@ public class HDMinimapPlugin extends Plugin {
     public void drawMapTile(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1) {
         hdRenderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
     }
-
 
 }

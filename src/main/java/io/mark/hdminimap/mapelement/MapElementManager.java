@@ -175,11 +175,13 @@ public class MapElementManager {
 
     private void processMapElement(int objectId, MapElementType type) {
         ObjectComposition def = client.getObjectDefinition(objectId);
-        if (def.getMapIconId() == -1 && def.getMapIconId() == -1) {
+        int mapId = (type == MapElementType.MAP_FUNCTION) ? def.getMapIconId() : def.getMapSceneId();
+
+        if (mapId == -1) {
             return;
         }
 
-        String category = getCategoryForMapAreaId(type, def.getMapIconId());
+        String category = getCategoryForMapAreaId(type, mapId);
         currentAreaCategories.add(category);
         
         MapElementSetting setting = getSetting(category);

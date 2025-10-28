@@ -28,7 +28,6 @@ package io.mark.hdminimap;
 import com.google.inject.Provides;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementSetting;
-import io.mark.hdminimap.mapelement.MapElementType;
 import io.mark.hdminimap.render.MinimapStyle;
 import io.mark.hdminimap.render.impl.HDRenderer;
 import io.mark.hdminimap.ui.MinimapPanel;
@@ -38,8 +37,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.events.ScriptPostFired;
-import net.runelite.api.worldmap.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -53,10 +50,6 @@ import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.Objects;
 
 @PluginDescriptor(
@@ -105,6 +98,7 @@ public class HDMinimapPlugin extends Plugin {
 	protected void startUp() {
         clientThread.invoke((() -> {
             mapElementManager.start();
+
             panel = injector.getInstance(MinimapPanel.class);
 
             final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
@@ -116,7 +110,9 @@ public class HDMinimapPlugin extends Plugin {
                     .panel(panel)
                     .build();
 
-            clientToolbar.addNavigation(button);
+            if (config.displaySidebar()) {
+                clientToolbar.addNavigation(button);
+            }
         }));
 
         currentStyle = config.minimapStyle();
@@ -146,6 +142,15 @@ public class HDMinimapPlugin extends Plugin {
                 setMinimapDrawer();
                 log.debug("Minimap style changed to: {}", currentStyle);
             }
+            if (Objects.equals(event.getKey(), "minimapSideBar")) {
+                if (config.displaySidebar()) {
+                    clientToolbar.addNavigation(button);
+                } else {
+                    clientToolbar.removeNavigation(button);
+                }
+                client.getObjectCompositionCache().reset();
+                reloadGame();
+            }
         }
         if (event.getGroup().equals(MapElementManager.CONFIG_GROUP)) {
             if (mapElementManager.isCategoryInCurrentArea(event.getKey())) {
@@ -165,6 +170,7 @@ public class HDMinimapPlugin extends Plugin {
 
     @Subscribe
     public void onGameTick(GameTick gameTick) {
+        if (!config.displaySidebar()) return;
         double zoom = client.getMinimapZoom();
         if (lastZoom != zoom) {
             lastZoom = zoom;
@@ -182,7 +188,7 @@ public class HDMinimapPlugin extends Plugin {
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged stateChanged) {
-        if (stateChanged.getGameState() == GameState.LOGGED_IN) {
+        if (stateChanged.getGameState() == GameState.LOGGED_IN && config.displaySidebar()) {
             mapElementManager.updateIcons();
         }
     }

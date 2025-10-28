@@ -22,4 +22,15 @@ public interface HDMinimapConfig extends Config {
     default MinimapStyle minimapStyle() {
         return MinimapStyle.HD;
     }
+
+
+    @ConfigItem(
+            keyName = "minimapSideBar",
+            name = "Map Elements Sidebar",
+            description = "Toggle visibility of minimap elements via the sidebar",
+            position = 2
+    )
+    default boolean displaySidebar() {
+        return true;
+    }
 }

@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum MapElementType {
     MAP_FUNCTION("map function", "mapfunctions","mapFunctions"),
-    MAP_ICON("map icon", "mapicons","mapIcons");
+    MAP_SCENERY("map scenery", "mapscenery","mapScenery");
 
     private final String displayName;
     private final String configPrefix;

@@ -1,126 +1,293 @@
 package io.mark.hdminimap.mapelement;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import io.mark.hdminimap.HDMinimapPlugin;
+import io.mark.hdminimap.utils.ImageUtils;
+import java.awt.image.BufferedImage;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.GameObject;
+import net.runelite.api.IndexedSprite;
 import net.runelite.api.ObjectComposition;
-import net.runelite.api.Tile;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Type;
 import java.util.*;
 
-import static net.runelite.api.Constants.EXTENDED_SCENE_SIZE;
-import static net.runelite.api.Constants.MAX_Z;
+import net.runelite.client.game.SpriteManager;
 
 @Slf4j
 @Singleton
 public class MapElementManager {
-    private static final Type LIST_TYPE = new TypeToken<List<MapElementEntry>>() {}.getType();
     public static final String CONFIG_GROUP = "hdminimap-json";
 
-    private final Map<MapElementType, List<MapElementEntry>> typeToEntriesMap = new EnumMap<>(MapElementType.class);
-    private final Map<Integer, String> enumMapIconNames = new HashMap<>();
+	private static final int MAXIMUM_OBJECT_ID_IN_GAME = 100000;
+	private static final int MAXIMUM_SCENERY_SPRITE = 265;
 
+	private static final String TRANSPORTATION_NAME = "Transportation";
+	private static final int TRANSPORTATION_MAP_GROUP = 58;
+
+	private Map<Integer, String> enumCategoryNames = new HashMap<>();
+	private Map<Integer, Integer> enumCategorySprites = new HashMap<>();
+	private Map<Integer, Integer> enumCategoryGroups = new HashMap<>();
+
+    private final Map<MapElementType, List<MapElementEntry>> typeToEntriesMap = new HashMap<>();
+	private final Map<String, List<Integer>> objLookup = new HashMap<>();
+
+
+	@Inject
+	private Client client;
     @Inject
     private Gson gson;
     @Inject
-    private Client client;
-    @Inject
     private ConfigManager configManager;
-    @Inject
-    private ClientThread clientThread;
+	@Inject
+	private SpriteManager spriteManager;
+	@Inject
+	private ClientThread clientThread;
 
-    public void start() {
-        for (MapElementType type : MapElementType.values()) {
+    public void start(Client client) {
+        this.client = client;
+
+		for (MapElementType type : MapElementType.values()) {
             typeToEntriesMap.put(type, new ArrayList<>());
         }
-        loadMapElements();
+
+		enumCategorySprites = loadIntegerEnum(1712);
+		enumCategoryNames = loadStringEnum(1713);
+		enumCategoryGroups = loadIntegerEnum(1714);
+		loadMapElements();
     }
 
-    private void loadMapElements() {
-        loadMapIconNames();
+	public Set<String> getKeyset()
+	{
+		return objLookup.keySet();
+	}
 
+	private Map<Integer, Integer> loadIntegerEnum(int enumID)
+	{
+		int[] keys = client.getEnum(enumID).getKeys();
+		int[] values = client.getEnum(enumID).getIntVals();
+		Map<Integer, Integer> loadedEnum = new HashMap<>();
+
+		for (int i = 0; i < Math.min(keys.length, values.length); i++)
+		{
+			loadedEnum.put(keys[i], values[i]);
+		}
+		return loadedEnum;
+	}
+
+	private Map<Integer, String> loadStringEnum(int enumID)
+	{
+		int[] keys = client.getEnum(enumID).getKeys();
+		String[] values = client.getEnum(enumID).getStringVals();
+		Map<Integer, String> loadedEnum = new HashMap<>();
+
+		for (int i = 0; i < Math.min(keys.length, values.length); i++)
+		{
+			String value = values[i];
+			if (value != null && !value.isBlank())
+			{
+				loadedEnum.put(keys[i], value);
+			}
+		}
+		return loadedEnum;
+	}
+
+    private void loadMapElements() {
         for (MapElementType type : MapElementType.values()) {
             List<MapElementEntry> entries = loadEntriesForType(type);
             typeToEntriesMap.put(type, entries);
             log.info("Loaded {} entries for {}", entries.size(), type);
         }
-
-        List<MapElementEntry> mapIcons = new ArrayList<>();
-        for (int i = 0; i < client.getMapScene().length; i++) {
-            mapIcons.add(new MapElementEntry("Icon" + i, i,-1));
-        }
-        typeToEntriesMap.put(MapElementType.MAP_ICON, mapIcons);
-
     }
 
     private List<MapElementEntry> loadEntriesForType(MapElementType type) {
-        String fileName = type.getFileName() + ".json";
+		List<MapElementEntry> entries = new ArrayList<>();
+		Map<String, List<Integer>> entryNamesAndMapIDs = new HashMap<>();
+		Map<Integer, List<Integer>> entryMapIDsAndObjectIDs = new HashMap<>();
+		Map<String, String> nameAndAlphabeticalPrefix = new HashMap<>();
+		Map<String, String> nameAndGroupingPrefix = new HashMap<>();
 
-        try (InputStream in = HDMinimapPlugin.class.getResourceAsStream(fileName)) {
-            if (in == null) {
-                log.warn("Missing resource for type {}: {}", type, fileName);
-                return Collections.emptyList();
-            }
+		String unknownSpritePrefix = (type == MapElementType.MAP_FUNCTION) ? "Icon" : "Scenery";
+		int unknownSpriteNumber = 0;
+		String alphabeticalPrefix;
+		String groupPrefix;
 
-            try (InputStreamReader reader = new InputStreamReader(in)) {
-                List<MapElementEntry> entries = gson.fromJson(reader, LIST_TYPE);
-                if (entries == null) {
-                    return Collections.emptyList();
-                }
+		objectIterationLoop:
+		for (int objectID = 0; objectID < MAXIMUM_OBJECT_ID_IN_GAME; objectID++)
+		{
+			alphabeticalPrefix = "";
+			groupPrefix = "";
+			ObjectComposition def = client.getObjectDefinition(objectID);
+			if (def == null)
+			{
+				continue;
+			}
 
-                if (type == MapElementType.MAP_FUNCTION) {
-                    for (MapElementEntry entry : entries) {
-                        if (entry.getCategory() == null) {
-                            String fallback = enumMapIconNames.get(entry.getCategoryID());
-                            if (fallback != null) {
-                                entry.setCategory(fallback);
-                            }
-                        }
-                    }
-                }
+			int mapID = (type == MapElementType.MAP_FUNCTION) ? def.getMapIconId() : def.getMapSceneId();
+			if (mapID == -1)
+			{
+				continue;
+			}
 
-                return entries;
-            }
-        } catch (Exception e) {
-            log.error("Failed to load map elements for {}", type, e);
-            return Collections.emptyList();
-        }
+			// Firstly check if the mapID is already registered, in which case add the objectID to the entry
+			for (List<Integer> namedMapIDs : entryNamesAndMapIDs.values())
+			{
+				if (namedMapIDs.contains(mapID))
+				{
+					entryMapIDsAndObjectIDs.get(namedMapIDs.get(0)).add(objectID);
+					continue objectIterationLoop;
+				}
+			}
+
+			// Secondly, check if the image is already used, in which case add the mapID and objectID to the entry
+			BufferedImage mapSprite = getImage(type, mapID);
+
+			for (List<Integer> entryMapID : entryNamesAndMapIDs.values())
+			{
+				BufferedImage entrySprite = getImage(type, entryMapID.get(0));
+				if (compareImages(mapSprite, entrySprite))
+				{
+					// Check for the Transportation Icon as this is also used for Fairy Rings
+					if (entryMapID.get(0) == TRANSPORTATION_MAP_GROUP && mapID != TRANSPORTATION_MAP_GROUP)
+					{
+						continue;
+					}
+
+					entryMapID.add(mapID);
+					entryMapIDsAndObjectIDs.get(entryMapID.get(0)).add(objectID);
+					continue objectIterationLoop;
+				}
+			}
+
+			// Thirdly, check the inbuilt category icons to see if there is a known name for the icon, or apply the
+			// default name
+			String name = null;
+			for (Map.Entry<Integer, Integer> categorySpriteEnum : enumCategorySprites.entrySet())
+			{
+				BufferedImage enumSprite = spriteManager.getSprite(categorySpriteEnum.getValue(),0);
+				if (enumSprite == null)
+				{
+					log.debug("Could not find enum Sprite for category {}", categorySpriteEnum.getKey());
+					break;
+				}
+
+				if (compareImages(mapSprite, enumSprite))
+				{
+					if (enumCategoryNames.containsKey(categorySpriteEnum.getKey()))
+					{
+						name = enumCategoryNames.get(categorySpriteEnum.getKey());
+						groupPrefix = enumCategoryGroups.get(categorySpriteEnum.getKey()).toString();
+						if (name.equals(TRANSPORTATION_NAME) && mapID != TRANSPORTATION_MAP_GROUP)
+						{
+							name = "Transportation (Fairy Rings)";
+							groupPrefix = "5";
+						}
+						break;
+					}
+				}
+			}
+			if (name == null)
+			{
+				name = unknownSpritePrefix + unknownSpriteNumber;
+				unknownSpriteNumber += 1;
+				alphabeticalPrefix = "z_";
+				groupPrefix = "5";
+			}
+
+			if (!name.equals("Map link")) // Map links aren't removable
+			{
+				List<Integer> newMapIDList = new ArrayList<>();
+				newMapIDList.add(mapID);
+				entryNamesAndMapIDs.put(name, newMapIDList);
+				List<Integer> newObjectIDList = new ArrayList<>();
+				newObjectIDList.add(objectID);
+				entryMapIDsAndObjectIDs.put(mapID, newObjectIDList);
+
+				nameAndAlphabeticalPrefix.put(name,alphabeticalPrefix);
+				nameAndGroupingPrefix.put(name,groupPrefix);
+			}
+		}
+
+		// Add all the entries - needs to be done at the end to collate ObjectIDs
+		for (Map.Entry<String, List<Integer>> entry : entryNamesAndMapIDs.entrySet())
+		{
+			String name = entry.getKey();
+			List<Integer> cumulativeObjectIDs = new ArrayList<>();
+			for (Integer mapID : entry.getValue())
+			{
+				if (entryMapIDsAndObjectIDs.containsKey(mapID))
+				{
+					cumulativeObjectIDs.addAll(entryMapIDsAndObjectIDs.get(mapID));
+				}
+			}
+			entries.add(new MapElementEntry(name, nameAndAlphabeticalPrefix.get(name), nameAndGroupingPrefix.get(name), entry.getValue().get(0), cumulativeObjectIDs));
+			objLookup.put(name, cumulativeObjectIDs);
+		}
+
+		return entries;
     }
 
-    private void loadMapIconNames() {
-        int[] ids = client.getEnum(1713).getKeys();
-        String[] names = client.getEnum(1713).getStringVals();
+	public BufferedImage getImage(MapElementType type, Integer id)
+	{
+		BufferedImage image = new BufferedImage(1,1,BufferedImage.TYPE_INT_ARGB);
+		if (type == MapElementType.MAP_FUNCTION)
+		{
+			image = client.getMapElementConfig(id).getMapIcon(false).toBufferedImage();
+		}
+		else if (type == MapElementType.MAP_SCENERY)
+		{
+			try
+			{
+				if (id < MAXIMUM_SCENERY_SPRITE)
+				{
+					IndexedSprite im = client.getMapScene()[id];
+					if (im != null)
+					{
+						image = ImageUtils.toBufferedImage(client.getMapScene()[id]);
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				log.debug("Error loading scenery ID: {}",id);
+			}
+		}
+		return image;
+	}
 
-        for (int i = 0; i < Math.min(ids.length, names.length); i++) {
-            String name = names[i];
-            if (name != null && !name.isBlank()) {
-                enumMapIconNames.put(ids[i], name);
-            }
-        }
-    }
+	public static boolean compareImages(BufferedImage imgA, BufferedImage imgB)
+	{
+		if (imgA == null || imgB == null)
+		{
+			return false;
+		}
+		if (imgA.getWidth() != imgB.getWidth() || imgA.getHeight() != imgB.getHeight())
+		{
+			return false;
+		}
+		int width = imgA.getWidth();
+		int height = imgA.getHeight();
 
-    public void clear() {
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+			{
+				if (imgA.getRGB(x, y) != imgB.getRGB(x, y))
+				{
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+    public void end() {
         typeToEntriesMap.clear();
-    }
-
-    public String getCategoryForMapAreaId(MapElementType type, int objectId) {
-        List<MapElementEntry> entries = typeToEntriesMap.getOrDefault(type, Collections.emptyList());
-        for (MapElementEntry entry : entries) {
-            if (entry.getMapId() == objectId) {
-                return entry.getCategory();
-            }
-        }
-        return "unknown";
+		enumCategoryNames.clear();
+		enumCategorySprites.clear();
+		enumCategoryGroups.clear();
     }
 
     public List<MapElementEntry> getAll(MapElementType type) {
@@ -131,72 +298,94 @@ public class MapElementManager {
         List<MapElementEntry> entries = typeToEntriesMap.getOrDefault(type, Collections.emptyList());
         Set<String> categories = new LinkedHashSet<>();
         for (MapElementEntry entry : entries) {
-            categories.add(entry.getCategory());
+            categories.add(entry.getName());
         }
         return categories;
     }
+
+	public Set<String> getAllCategoriesAlphabetical(MapElementType type) {
+		List<MapElementEntry> entries = typeToEntriesMap.getOrDefault(type, Collections.emptyList());
+		Set<String> categories = new LinkedHashSet<>();
+		for (MapElementEntry entry : entries) {
+			categories.add(entry.getNameSortPrefix() + entry.getName());
+		}
+		return categories;
+	}
+
+	public Set<String> getAllCategoriesGrouping(MapElementType type) {
+		List<MapElementEntry> entries = typeToEntriesMap.getOrDefault(type, Collections.emptyList());
+		Set<String> categories = new LinkedHashSet<>();
+		for (MapElementEntry entry : entries) {
+			categories.add(entry.getGroupSortPrefix() + entry.getNameSortPrefix() + entry.getName());
+		}
+		return categories;
+	}
 
     public int getEntryCount(MapElementType type) {
         List<MapElementEntry> entries = typeToEntriesMap.getOrDefault(type, Collections.emptyList());
         return entries.size();
     }
 
-    public void updateIcons() {
-        currentAreaCategories.clear();
-        
-        Tile[][][] tiles = client.getTopLevelWorldView().getScene().getExtendedTiles();
+	public void updateIcon(String name)
+	{
+		clientThread.invoke(() -> {
+			MapElementType type = getTypeFromNamedEntry(name);
+			for (Integer ob : objLookup.get(name))
+			{
+				processMapElement(name, ob, type);
+			}
+		});
+	}
 
-        for (int z = 0; z < MAX_Z; z++) {
-            for (int x = 0; x < EXTENDED_SCENE_SIZE; x++) {
-                for (int y = 0; y < EXTENDED_SCENE_SIZE; y++) {
-                    Tile tile = tiles[z][x][y];
-                    if (tile == null) {
-                        continue;
-                    }
+	private MapElementType getTypeFromNamedEntry(String name)
+	{
+		MapElementType type2 = MapElementType.MAP_FUNCTION;
+		for (MapElementType type : MapElementType.values())
+		{
+			for (MapElementEntry entry : typeToEntriesMap.getOrDefault(type, Collections.emptyList()))
+			{
+				if (entry.getName().equals(name))
+				{
+					return type;
+				}
+			}
+		}
+		return type2;
+	}
 
-                    if (tile.getGroundObject() != null) {
-                        int id = tile.getGroundObject().getId();
-                        processMapElement(id, MapElementType.MAP_FUNCTION);
-                        processMapElement(id, MapElementType.MAP_ICON);
-                    }
+	private int getMapIDFromNamedEntry(String name)
+	{
+		int mapID = -1;
+		for (MapElementType type : MapElementType.values())
+		{
+			for (MapElementEntry entry : typeToEntriesMap.getOrDefault(type, Collections.emptyList()))
+			{
+				if (entry.getName().equals(name))
+				{
+					return entry.getMapID();
+				}
+			}
+		}
+		return mapID;
+	}
 
-                    GameObject[] gameObjects = tile.getGameObjects();
-                    if (gameObjects != null) {
-                        for (GameObject obj : gameObjects) {
-                            if (obj != null) {
-                                processMapElement(obj.getId(), MapElementType.MAP_ICON);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    private void processMapElement(String name, Integer objectId, MapElementType type) {
+		ObjectComposition def = client.getObjectDefinition(objectId);
 
-    private void processMapElement(int objectId, MapElementType type) {
-        ObjectComposition def = client.getObjectDefinition(objectId);
-        int mapId = (type == MapElementType.MAP_FUNCTION) ? def.getMapIconId() : def.getMapSceneId();
-
-        if (mapId == -1) {
-            return;
-        }
-
-        String category = getCategoryForMapAreaId(type, mapId);
-        currentAreaCategories.add(category);
-        
-        MapElementSetting setting = getSetting(category);
+        MapElementSetting setting = getSetting(name);
 
         boolean matchesZoom = setting.getScale() == null || setting.getScale() >= (float) client.getMinimapZoom();
         boolean shouldHide = setting.isDisabled() && matchesZoom;
 
+		int mapID = -1; // set to hide
         if (!shouldHide) {
-            return;
+			mapID = getMapIDFromNamedEntry(name);
         }
 
         if (type == MapElementType.MAP_FUNCTION) {
-            def.setMapIconId(-1);
-        } else if (type == MapElementType.MAP_ICON) {
-            def.setMapSceneId(-1);
+            def.setMapIconId(mapID);
+        } else if (type == MapElementType.MAP_SCENERY) {
+            def.setMapSceneId(mapID);
         }
     }
 
@@ -223,15 +412,4 @@ public class MapElementManager {
         MapElementSetting current = getSetting(category);
         saveSetting(category, new MapElementSetting(current.isDisabled(), scale));
     }
-
-    public final Set<String> currentAreaCategories = new HashSet<>();
-
-    public Set<String> getCurrentAreaCategories() {
-        return new HashSet<>(currentAreaCategories);
-    }
-
-    public boolean isCategoryInCurrentArea(String category) {
-        return currentAreaCategories.contains(category);
-    }
-
 }

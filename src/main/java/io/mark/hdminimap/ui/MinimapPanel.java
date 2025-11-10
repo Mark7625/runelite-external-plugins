@@ -2,7 +2,6 @@ package io.mark.hdminimap.ui;
 
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementType;
-import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
@@ -16,7 +15,7 @@ import java.awt.*;
 public class MinimapPanel extends PluginPanel {
 
     @Inject
-    private MinimapPanel(MapElementManager mapElementManager, Client client)
+    private MinimapPanel(MapElementManager mapElementManager)
     {
         super(false);
 
@@ -26,8 +25,8 @@ public class MinimapPanel extends PluginPanel {
         JPanel display = new JPanel();
         MaterialTabGroup tabGroup = new MaterialTabGroup(display);
 
-        MaterialTab mapFunctionTab = new MaterialTab("Map Functions", tabGroup, new MapIconViewer(mapElementManager,client, MapElementType.MAP_FUNCTION));
-        MaterialTab mapSceneTab = new MaterialTab("Map Scenes", tabGroup, new MapIconViewer(mapElementManager,client, MapElementType.MAP_ICON));
+        MaterialTab mapFunctionTab = new MaterialTab("Map Functions", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_FUNCTION));
+        MaterialTab mapSceneTab = new MaterialTab("Map Scenery", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_SCENERY));
 
         tabGroup.setBorder(new EmptyBorder(5, 0, 0, 0));
         tabGroup.addTab(mapFunctionTab);
@@ -37,5 +36,4 @@ public class MinimapPanel extends PluginPanel {
         add(tabGroup, BorderLayout.NORTH);
         add(display, BorderLayout.CENTER);
     }
-
 }

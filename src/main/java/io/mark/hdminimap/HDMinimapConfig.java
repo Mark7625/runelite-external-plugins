@@ -27,7 +27,7 @@ public interface HDMinimapConfig extends Config {
     @ConfigItem(
             keyName = "minimapSideBar",
             name = "Map Elements Sidebar",
-            description = "Toggle visibility of map elements via the sidebar (only if logged in)",
+            description = "Toggle visibility of map elements via the sidebar",
             position = 2
     )
     default boolean displaySidebar() {

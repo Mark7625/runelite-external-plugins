@@ -26,6 +26,7 @@
 package io.mark.hdminimap;
 
 import com.google.inject.Provides;
+import io.mark.hdminimap.mapelement.MapElementCategories;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementSetting;
 import io.mark.hdminimap.render.MinimapStyle;
@@ -95,7 +96,7 @@ public class HDMinimapPlugin extends Plugin {
 
     @Override
 	protected void startUp() {
-        clientThread.invoke(this::setupPanel);
+		clientThread.invoke(this::setupPanel);
 
         currentStyle = config.minimapStyle();
         setMinimapDrawer();
@@ -169,12 +170,13 @@ public class HDMinimapPlugin extends Plugin {
         if (lastZoom != zoom) {
             lastZoom = zoom;
 
-            for (String category : mapElementManager.getKeyset()) {
-                MapElementSetting setting = mapElementManager.getSetting(category);
-                if (setting.isDisabled() && setting.getScale() != null) {
-					mapElementManager.updateIcon(category);
-                }
-            }
+			for (MapElementCategories entry : MapElementCategories.values())
+			{
+				MapElementSetting setting = mapElementManager.getSetting(entry.getDefaultName());
+				if (setting.isDisabled() && setting.getScale() != null) {
+					mapElementManager.updateIcon(entry.getDefaultName());
+				}
+			}
 			reloadGame();
         }
     }

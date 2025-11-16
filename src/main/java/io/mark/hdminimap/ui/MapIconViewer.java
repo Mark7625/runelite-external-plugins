@@ -1,8 +1,8 @@
 package io.mark.hdminimap.ui;
 
-import io.mark.hdminimap.mapelement.MapElementEntry;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementType;
+import io.mark.hdminimap.mapelement.MapElementCategories;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import net.runelite.client.ui.ColorScheme;
@@ -44,7 +44,7 @@ public class MapIconViewer extends JPanel
             7.75f, 8.0f
     };
 
-    private MapElementEntry currentEntry;
+    private MapElementCategories currentEntry;
 
     @Inject
     public MapIconViewer(MapElementManager mapElementManager, MapElementType mapElementType)
@@ -65,13 +65,18 @@ public class MapIconViewer extends JPanel
         buttonsFlowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6));
 
         int index = 0;
-		for (MapElementEntry entry : mapElementManager.getAll(mapElementType))
+		for (MapElementCategories element : MapElementCategories.values())
 		{
-			BufferedImage original = mapElementManager.getImage(mapElementType, entry.getMapID());
+			if (element.getType() != mapElementType)
+			{
+				continue;
+			}
+
+			BufferedImage original = mapElementManager.getImage(mapElementType, element.getMapID());
 
 			if (original != null)
 			{
-				JButton btn = createButton(entry, original);
+				JButton btn = createButton(element, original);
 				buttonsFlowPanel.add(btn);
 				buttons[index++] = btn;
 			}
@@ -103,8 +108,8 @@ public class MapIconViewer extends JPanel
             {
                 String selected = (String) scaleComboBox.getSelectedItem();
                 Float scale = "Any".equals(selected) ? null : Float.parseFloat(selected);
-                mapElementManager.setScale(currentEntry.getName(), scale);
-				mapElementManager.updateIcon(currentEntry.getName());
+                mapElementManager.setScale(currentEntry.getDefaultName(), scale);
+				mapElementManager.updateIcon(currentEntry.getDefaultName());
             }
         });
 
@@ -192,10 +197,9 @@ public class MapIconViewer extends JPanel
     private void filterAndSortButtons(String query, String sortOption)
     {
         query = query.toLowerCase();
-
         Map<String, JButton> categoryButtonMap = new HashMap<>();
-        List<String> categories = "Alphabetical".equals(sortOption) ? new ArrayList<>(mapElementManager.getAllCategoriesAlphabetical(mapElementType)) :
-			"Grouping".equals(sortOption) ? new ArrayList<>(mapElementManager.getAllCategoriesGrouping(mapElementType)) : new ArrayList<>();
+        List<String> categories = "Alphabetical".equals(sortOption) ? new ArrayList<>(mapElementManager.getAlphabeticalCategories(mapElementType,false)) :
+			"Grouping".equals(sortOption) ? new ArrayList<>(mapElementManager.getAlphabeticalCategories(mapElementType,true)) : new ArrayList<>();
 
         for (int i = 0; i < buttons.length; i++)
         {
@@ -227,7 +231,7 @@ public class MapIconViewer extends JPanel
         buttonPanel.repaint();
     }
 
-    private JButton createButton(MapElementEntry entry, BufferedImage image)
+    private JButton createButton(MapElementCategories entry, BufferedImage image)
     {
         JButton button = new JButton();
         button.setPreferredSize(new Dimension(BUTTON_SIZE, BUTTON_SIZE));
@@ -236,19 +240,19 @@ public class MapIconViewer extends JPanel
         button.setOpaque(true);
         button.setIcon(new ImageIcon(image));
 
-        button.setToolTipText(entry.getName());
+        button.setToolTipText(entry.getDefaultName());
 
-        boolean isDisabled = mapElementManager.getSetting(entry.getName()).isDisabled();
+        boolean isDisabled = mapElementManager.getSetting(entry.getDefaultName()).isDisabled();
         button.setBackground(isDisabled ? new Color(255, 0, 0, 120) : ColorScheme.DARKER_GRAY_COLOR);
 
         button.addActionListener(e -> {
             boolean active = !isActive(button);
             button.setBackground(active ? new Color(255, 0, 0, 120) : ColorScheme.DARKER_GRAY_COLOR);
-            boolean newState = !mapElementManager.getSetting(entry.getName()).isDisabled();
-            mapElementManager.setDisabled(entry.getName(), newState);
+            boolean newState = !mapElementManager.getSetting(entry.getDefaultName()).isDisabled();
+            mapElementManager.setDisabled(entry.getDefaultName(), newState);
 
             hideInlineConfig();
-			mapElementManager.updateIcon(entry.getName());
+			mapElementManager.updateIcon(entry.getDefaultName());
         });
 
         button.addMouseListener(new MouseAdapter()
@@ -273,15 +277,15 @@ public class MapIconViewer extends JPanel
         return button.getBackground().equals(new Color(255, 0, 0, 120));
     }
 
-    private void showInlineConfig(MapElementEntry entry)
+    private void showInlineConfig(MapElementCategories entry)
     {
         if (mapElementType == MapElementType.MAP_SCENERY) {
             return;
         }
         currentEntry = entry;
-        selectedLabel.setText(entry.getName() + ": ");
+        selectedLabel.setText(entry.getDefaultName() + ": ");
 
-        Float currentScale = mapElementManager.getSetting(entry.getName()).getScale();
+        Float currentScale = mapElementManager.getSetting(entry.getDefaultName()).getScale();
         if (currentScale == null)
         {
             scaleComboBox.setSelectedIndex(0);

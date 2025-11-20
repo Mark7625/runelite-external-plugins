@@ -1,6 +1,7 @@
 package io.mark.hdminimap.render.impl;
 
 import io.mark.hdminimap.render.MinimapRenderer;
+import io.mark.hdminimap.render.MinimapStyle;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 
@@ -16,15 +17,18 @@ public class HDRenderer extends MinimapRenderer {
 
     @Override
     public void drawMapTile(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1) {
-        client.getRasterizer().setRasterGouraudLowRes(false);
-        if (tile != null) {
-            try {
-                renderTilePaint(tile, px0, py0, px1, py1);
-                renderTileModel(tile, tx, ty, px0, py0, px1, py1);
-            } catch (Exception e) {
-                client.getRasterizer().setRasterGouraudLowRes(true);
-                log.error("Minimap Tile Rendering", e);
-            }
+        Rasterizer rasterizer = client.getRasterizer();
+        rasterizer.setRasterGouraudLowRes(false);
+
+        if (tile == null) {
+            return;
+        }
+
+        try {
+            renderTilePaint(tile, px0, py0, px1, py1);
+            renderTileModel(tile, tx, ty, px0, py0, px1, py1);
+        } catch (Exception e) {
+            rasterizer.setRasterGouraudLowRes(true);
         }
     }
 

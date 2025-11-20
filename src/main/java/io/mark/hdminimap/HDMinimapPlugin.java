@@ -29,9 +29,11 @@ import com.google.inject.Provides;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementSetting;
 import io.mark.hdminimap.render.MinimapStyle;
+import io.mark.hdminimap.render.impl.HD117Renderer;
 import io.mark.hdminimap.render.impl.HDRenderer;
 import io.mark.hdminimap.ui.MinimapPanel;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
@@ -41,6 +43,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.PluginManager;
@@ -50,6 +53,7 @@ import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
 import java.awt.image.BufferedImage;
+import java.util.Map;
 import java.util.Objects;
 
 @PluginDescriptor(
@@ -71,6 +75,10 @@ public class HDMinimapPlugin extends Plugin {
     private HDRenderer hdRenderer;
 
     @Inject
+    private HD117Renderer hd117Renderer;
+
+
+    @Inject
     private HDMinimapConfig config;
 
     @Inject
@@ -85,6 +93,10 @@ public class HDMinimapPlugin extends Plugin {
 
     @Inject
     private ClientToolbar clientToolbar;
+
+    @Getter
+    @Setter
+    private MinimapStyle fallback;
 
     private Double lastZoom = null;
 
@@ -160,12 +172,25 @@ public class HDMinimapPlugin extends Plugin {
         }
     }
 
-    public void setMinimapDrawer() {
-        if (currentStyle != MinimapStyle.DEFAULT) {
-            client.setMinimapTileDrawer(this::drawMapTile);
-        } else {
+    public void setMinimapDrawer()
+    {
+        MinimapStyle style = config.minimapStyle();
+
+        if (style == MinimapStyle.DEFAULT)
+        {
             client.setMinimapTileDrawer(null);
+            return;
         }
+
+        client.setMinimapTileDrawer((tile, tx, ty, px0, py0, px1, py1) ->
+        {
+            boolean handled = drawCustomMinimap(tile, tx, ty, px0, py0, px1, py1);
+
+            if (!handled)
+            {
+                client.setMinimapTileDrawer(null);
+            }
+        });
     }
 
     @Subscribe
@@ -208,18 +233,49 @@ public class HDMinimapPlugin extends Plugin {
     }
 
     /**
-     * Draws a minimap tile using the currently selected renderer
+     * Attempts to draw a minimap tile using the currently selected minimap style.
+     *
+     * <p>If the selected style fails to draw the tile due to an exception,
+     * the failure is logged, and this method returns {@code false} to indicate
+     * that the tile was not drawn.</p>
      *
      * @param tile the tile to draw
-     * @param tx   tile x coordinate
-     * @param ty   tile y coordinate
-     * @param px0  pixel x start coordinate
-     * @param py0  pixel y start coordinate
-     * @param px1  pixel x end coordinate
-     * @param py1  pixel y end coordinate
+     * @param tx   tile X coordinate
+     * @param ty   tile Y coordinate
+     * @param px0  pixel X start coordinate
+     * @param py0  pixel Y start coordinate
+     * @param px1  pixel X end coordinate
+     * @param py1  pixel Y end coordinate
+     * @return {@code true} if the tile was drawn successfully,
+     *         {@code false} if an exception occurred during drawing
      */
-    public void drawMapTile(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1) {
-        hdRenderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
+    public boolean drawCustomMinimap(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1) {
+        try {
+            switch (config.minimapStyle()) {
+                case HD117 -> hd117Renderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
+                case HD    -> hdRenderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to draw minimap tile at ({}, {}) with style {}", tx, ty, config.minimapStyle(), e);
+            return false;
+        }
+    }
+
+
+    @Subscribe
+    public void onPluginMessage(PluginMessage pluginMessage) {
+        if ("minimap".equals(pluginMessage.getName()) && "117hd".equals(pluginMessage.getNamespace())) {
+            Map<String, Object> payload = pluginMessage.getData();
+
+            if (payload != null) {
+                int[][][][] paintColors = (int[][][][]) payload.get("paintColors");
+                int[][][][][] modelColors = (int[][][][][]) payload.get("modelColors");
+                hd117Renderer.setMinimapTileModelColorsLighting(modelColors);
+                hd117Renderer.setMinimapTilePaintColorsLighting(paintColors);
+
+            }
+        }
     }
 
 }

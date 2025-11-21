@@ -111,7 +111,7 @@ public class HDMinimapPlugin extends Plugin {
 		panel = injector.getInstance(MinimapPanel.class);
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		button = NavigationButton.builder()
-			.tooltip("Clean Maps")
+			.tooltip("Custom Maps")
 			.icon(icon)
 			.priority(3)
 			.panel(panel)
@@ -168,16 +168,25 @@ public class HDMinimapPlugin extends Plugin {
         if (!config.displaySidebar()) return;
         double zoom = client.getMinimapZoom();
         if (lastZoom != zoom) {
-            lastZoom = zoom;
-
+			boolean shouldReload = false;
 			for (MapElementCategories entry : MapElementCategories.values())
 			{
 				MapElementSetting setting = mapElementManager.getSetting(entry.getDefaultName());
-				if (setting.isDisabled() && setting.getScale() != null) {
-					mapElementManager.updateIcon(entry.getDefaultName());
+				Float scale = setting.getScale();
+				if (setting.isDisabled() && scale != null) {
+					if ((scale <= zoom && scale >= lastZoom) ||
+						(scale >= zoom && scale <= lastZoom)) {
+						mapElementManager.updateIcon(entry.getDefaultName());
+						shouldReload = true;
+					}
 				}
 			}
-			reloadGame();
+			if (shouldReload)
+			{
+				reloadGame();
+			}
+
+            lastZoom = zoom;
         }
     }
 

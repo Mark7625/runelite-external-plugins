@@ -131,7 +131,6 @@ public class HDMinimapPlugin extends Plugin {
         client.setMinimapTileDrawer(null);
         client.getObjectCompositionCache().reset();
         reloadGame();
-        mapElementManager.end();
 	}
 
     @Subscribe

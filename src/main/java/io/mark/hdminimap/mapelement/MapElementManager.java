@@ -21,9 +21,6 @@ import net.runelite.client.game.SpriteManager;
 public class MapElementManager {
     public static final String CONFIG_GROUP = "hdminimap-json";
 
-	private Map<Integer, Integer> enumCategoryGroups = new HashMap<>();
-
-
 	@Inject
 	private Client client;
     @Inject
@@ -37,21 +34,7 @@ public class MapElementManager {
 
     public void start(Client client) {
         this.client = client;
-		enumCategoryGroups = loadIntegerEnum(1714);
     }
-
-	private Map<Integer, Integer> loadIntegerEnum(int enumID)
-	{
-		int[] keys = client.getEnum(enumID).getKeys();
-		int[] values = client.getEnum(enumID).getIntVals();
-		Map<Integer, Integer> loadedEnum = new HashMap<>();
-
-		for (int i = 0; i < Math.min(keys.length, values.length); i++)
-		{
-			loadedEnum.put(keys[i], values[i]);
-		}
-		return loadedEnum;
-	}
 
 	public BufferedImage getImage(MapElementType type, Integer id)
 	{
@@ -81,25 +64,13 @@ public class MapElementManager {
 		return image;
 	}
 
-    public void end() {
-		enumCategoryGroups.clear();
-    }
-
 	public Set<String> getAlphabeticalCategories(MapElementType type, boolean includeGrouping) {
 		Set<String> categories = new LinkedHashSet<>();
 		for (MapElementCategories element : MapElementCategories.values())
 		{
 			if (element.getType() == type)
 			{
-				if (includeGrouping)
-				{
-					categories.add(enumCategoryGroups.get(element.getCategoryOrNull()) + element.getDefaultName());
-				}
-				else
-				{
-					categories.add(element.getDefaultName());
-				}
-
+				categories.add((includeGrouping ? element.getGrouping() : "") + element.getDefaultName());
 			}
 		}
 		return categories;

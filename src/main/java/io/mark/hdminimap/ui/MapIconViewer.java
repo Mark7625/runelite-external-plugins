@@ -169,7 +169,7 @@ public class MapIconViewer extends JPanel
         if (mapElementType != MapElementType.MAP_SCENERY) {
             PluginErrorPanel errorPanel = new PluginErrorPanel();
             errorPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
-            errorPanel.setContent("Info", "Right-click a disabled map function button to adjust the minimap zoom scale at which it becomes hidden (default is any zoom level).");
+            errorPanel.setContent("Info", "Left-click something to toggle it's visibility. If red (hidden), it can also be right-clicked to adjust the minimap zoom scale at which it becomes hidden (default is any zoom level).");
 
             headerPanel.add(errorPanel, BorderLayout.SOUTH);
         }

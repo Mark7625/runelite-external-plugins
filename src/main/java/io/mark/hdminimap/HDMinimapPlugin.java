@@ -247,9 +247,10 @@ public class HDMinimapPlugin extends Plugin {
      */
     public boolean drawCustomMinimap(Tile tile, int tx, int ty, int px0, int py0, int px1, int py1) {
         try {
-            switch (config.minimapStyle()) {
-                case HD117 -> hd117Renderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
-                case HD    -> hdRenderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
+            if (config.minimapStyle() == MinimapStyle.HD117) {
+                hd117Renderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
+            } else if (config.minimapStyle() == MinimapStyle.HD) {
+                hdRenderer.drawMapTile(tile, tx, ty, px0, py0, px1, py1);
             }
             return true;
         } catch (Exception e) {

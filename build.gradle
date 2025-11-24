@@ -7,19 +7,17 @@ repositories {
 	mavenCentral()
 }
 
-def runeLiteVersion = '1.11.+'
+def runeLiteVersion = '1.12.+'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
 
 
-	compileOnly 'org.projectlombok:lombok:1.18.4'
-	annotationProcessor 'org.projectlombok:lombok:1.18.4'
+	compileOnly 'org.projectlombok:lombok:1.18.20'
+	annotationProcessor 'org.projectlombok:lombok:1.18.20'
 
 	testImplementation 'junit:junit:4.12'
-	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion/*, {
-		exclude group: 'ch.qos.logback', module: 'logback-classic'
-	}*/
+	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
     testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
 	testCompileOnly 'org.projectlombok:lombok:1.18.20'
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.20'
@@ -27,7 +25,8 @@ dependencies {
 }
 
 group = 'io.mark.hdminimap'
-version = '1.4'
+version = '1.5'
+sourceCompatibility = '11'
 
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'

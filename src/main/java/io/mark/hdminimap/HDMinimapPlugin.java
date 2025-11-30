@@ -41,6 +41,7 @@ import net.runelite.api.*;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PluginMessage;
@@ -100,6 +101,9 @@ public class HDMinimapPlugin extends Plugin {
 
     private Double lastZoom = null;
 
+    @Inject
+    private EventBus eventBus;
+
 
     @Provides
     HDMinimapConfig provideConfig(ConfigManager configManager) {
@@ -114,6 +118,9 @@ public class HDMinimapPlugin extends Plugin {
         setMinimapDrawer();
         reloadGame();
         lastZoom = client.getMinimapZoom();
+        if (currentStyle == MinimapStyle.HD117) {
+            eventBus.post(new PluginMessage("117hd", "subscribe:event.minimap"));
+        }
 	}
 
 	private void setupPanel()
@@ -143,6 +150,7 @@ public class HDMinimapPlugin extends Plugin {
         client.setMinimapTileDrawer(null);
         client.getObjectCompositionCache().reset();
         reloadGame();
+        eventBus.post(new PluginMessage("117hd", "unsubscribe:event.minimap"));
 	}
 
     @Subscribe
@@ -150,6 +158,12 @@ public class HDMinimapPlugin extends Plugin {
         if (event.getGroup().equals(HDMinimapConfig.CONFIG_GROUP)) {
             if (Objects.equals(event.getKey(), "minimapStyle")) {
                 currentStyle = config.minimapStyle();
+                if (currentStyle == MinimapStyle.HD117) {
+                    eventBus.post(new PluginMessage("117hd", "subscribe:event.minimap"));
+                } else {
+                    eventBus.post(new PluginMessage("117hd", "unsubscribe:event.minimap"));
+                }
+
                 setMinimapDrawer();
                 log.debug("Minimap style changed to: {}", currentStyle);
             }
@@ -259,19 +273,28 @@ public class HDMinimapPlugin extends Plugin {
         }
     }
 
-
     @Subscribe
-    public void onPluginMessage(PluginMessage pluginMessage) {
-        if ("minimap".equals(pluginMessage.getName()) && "117hd".equals(pluginMessage.getNamespace())) {
-            Map<String, Object> payload = pluginMessage.getData();
+    public void onPluginMessage(PluginMessage message) {
+        if (message.getNamespace().equals("117hd") && message.getName().equals("event.minimap")) {
+            Map<String, Object> data = message.getData();
 
-            if (payload != null) {
-                int[][][][] paintColors = (int[][][][]) payload.get("paintColors");
-                int[][][][][] modelColors = (int[][][][][]) payload.get("modelColors");
-                hd117Renderer.setMinimapTileModelColorsLighting(modelColors);
-                hd117Renderer.setMinimapTilePaintColorsLighting(paintColors);
-
+            if (data.containsKey("startup") && (Boolean) data.get("startup") && config.minimapStyle() == MinimapStyle.HD117) {
+                eventBus.post(new PluginMessage("117hd", "subscribe:event.minimap"));
+                return;
             }
+
+            if (data.containsKey("shutdown") && (Boolean) data.get("shutdown")) {
+                hd117Renderer.setMinimapTileModelColorsLighting(null);
+                hd117Renderer.setMinimapTilePaintColorsLighting(null);
+                return;
+            }
+
+            int[][][][] paintColors = (int[][][][]) data.get("paintColors");
+            int[][][][][] modelColors = (int[][][][][]) data.get("modelColors");
+            hd117Renderer.setMinimapTileModelColorsLighting(modelColors);
+            hd117Renderer.setMinimapTilePaintColorsLighting(paintColors);
+
         }
     }
+
 }

@@ -49,6 +49,9 @@ public class WorldMapOverlay extends Overlay {
     @Inject
     private F2pPlugin f2pPlugin;
 
+    @Inject
+    private Gson gson;
+
     private List<int[]> pts;
     private List<OverrideArea> overrideNonMembers;
     private List<OverrideArea> overrideMembers;
@@ -61,7 +64,7 @@ public class WorldMapOverlay extends Overlay {
     private Rectangle cachedGrayscaleBoundsRect = null;
     private Area cachedF2pArea = null;
 
-    private void loadPointsFromJson() {
+    public void loadPointsFromJson() {
         try {
             InputStream inputStream = WorldMapOverlay.class.getResourceAsStream("/f2p-area.json");
             if (inputStream == null) {
@@ -71,8 +74,7 @@ public class WorldMapOverlay extends Overlay {
                 this.overrideMembers = new ArrayList<>();
                 return;
             }
-            
-            Gson gson = new Gson();
+
             F2pAreaData data = gson.fromJson(new InputStreamReader(inputStream, StandardCharsets.UTF_8), F2pAreaData.class);
             
             if (data != null) {
@@ -111,7 +113,6 @@ public class WorldMapOverlay extends Overlay {
     public WorldMapOverlay() {
         setLayer(OverlayLayer.ABOVE_WIDGETS);
         setPosition(OverlayPosition.DYNAMIC);
-        loadPointsFromJson();
     }
 
     @Override

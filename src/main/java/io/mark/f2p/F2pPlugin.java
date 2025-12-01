@@ -105,6 +105,7 @@ public class F2pPlugin extends Plugin
 
     @Override
     protected void startUp() {
+        worldMapOverlay.loadPointsFromJson();
         overlayManager.add(overlay);
         overlayManager.add(worldMapOverlay);
     }

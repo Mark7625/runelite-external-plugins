@@ -25,6 +25,7 @@
 package io.mark.f2p;
 
 import io.mark.f2p.config.ActiveType;
+import io.mark.f2p.config.OverlayMode;
 import net.runelite.client.config.*;
 
 import java.awt.*;
@@ -34,24 +35,24 @@ public interface F2pConfig extends Config
 {
 	String GROUP = "f2p";
 
-	@ConfigSection(
-			name = "Global",
-			description = "Global Item Settings",
-			position = 0
-	)
-	String globalSettings = "globalsettings";
+    @ConfigItem(
+            keyName = "overlayActive",
+            name = "Overlay Active",
+            description = "When to show the overlay: Always, Never, or Only on Members Worlds",
+            position = 0
+    )
+    default ActiveType overlayActive()
+    {
+        return ActiveType.FREE_WORLDS_ONLY;
+    }
 
-	@ConfigItem(
-			keyName = "active",
-			name = "Active Mode",
-			description = "Pick when you want the effects to show",
-			position = 1,
-			section = globalSettings
+
+    @ConfigSection(
+			name = "Item Overlay",
+			description = "Item Overlay Settings",
+			position = 1
 	)
-	default ActiveType globalActive()
-	{
-		return ActiveType.ALWAYS;
-	}
+	String itemOverlaySettings = "itemoverlaysettings";
 
 	@Range(
 			min = -1,
@@ -59,44 +60,126 @@ public interface F2pConfig extends Config
 	)
 	@ConfigItem(
 			keyName = "icon",
-			name = "Icon",
+			name = "Item Icon",
 			description = "Icon that shows if f2p (-1 = none)",
 			position = 1,
-			section = globalSettings
+			section = itemOverlaySettings
 	)
 	default int icon()
 	{
 		return -1;
 	}
 
-	@ConfigSection(
-			name = "Grand Exchange",
-			description = "Grand Exchange",
-			position = 0
-	)
-	String grandexchangeSettings = "grandexchange";
-
 	@ConfigItem(
-			keyName = "geactive",
-			name = "Active Mode",
-			description = "Pick when you want the effects to show",
-			position = 1,
-			section = grandexchangeSettings
+			keyName = "overlayMode",
+			name = "Item Mode",
+			description = "Select the rendering mode for item overlays: Black and White (grayscale), Outline (colored outline), or Fill (colored fill)",
+			position = 2,
+			section = itemOverlaySettings
 	)
-	default ActiveType active()
+	default OverlayMode overlayMode()
 	{
-		return ActiveType.ALWAYS;
+		return OverlayMode.BLACK_AND_WHITE;
 	}
 
 	@ConfigItem(
-			keyName = "geresultColor",
-			name = "Result Color",
-			description = "Displays the items in this color when p2p",
-			position = 2,
-			section = grandexchangeSettings
+			keyName = "overlayColor",
+			name = "Item Overlay Color",
+			description = "Color for outline and fill overlay modes",
+			position = 3,
+			section = itemOverlaySettings
 	)
-	default Color textColor()
+	default Color overlayColor()
+	{
+		return Color.RED;
+	}
+
+	@Range(max = 255)
+	@ConfigItem(
+			keyName = "overlayAlpha",
+			name = "Item Overlay Alpha",
+			description = "Transparency for overlay (0 = fully transparent, 255 = fully opaque)",
+			position = 4,
+			section = itemOverlaySettings
+	)
+	default int overlayAlpha()
+	{
+		return 125;
+	}
+
+	@ConfigSection(
+			name = "World Map",
+			description = "World Map Overlay Settings",
+			position = 1
+	)
+	String worldMapSettings = "worldmapsettings";
+
+	@ConfigItem(
+			keyName = "showMapOverlay",
+			name = "Show Map Overlay",
+			description = "Show the grayscale overlay and border on the world map",
+			position = 1,
+			section = worldMapSettings
+	)
+	default boolean showMapOverlay()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "mapBorderColor",
+			name = "Border Color",
+			description = "Color for the F2P area border on the world map",
+			position = 2,
+			section = worldMapSettings
+	)
+	default Color mapBorderColor()
 	{
 		return Color.BLACK;
 	}
+
+	@Range(
+			min = 1,
+			max = 10
+	)
+	@ConfigItem(
+			keyName = "mapBorderThickness",
+			name = "Border Thickness",
+			description = "Thickness of the F2P area border (1-10)",
+			position = 3,
+			section = worldMapSettings
+	)
+	default int mapBorderThickness()
+	{
+		return 2;
+	}
+
+	@ConfigItem(
+			keyName = "mapFillColor",
+			name = "Fill Color",
+			description = "Color for the grayscale overlay fill (outside F2P area)",
+			position = 4,
+			section = worldMapSettings
+	)
+	default Color mapFillColor()
+	{
+		return new Color(128, 128, 128);
+	}
+
+	@Range(
+			min = 0,
+			max = 255
+	)
+	@ConfigItem(
+			keyName = "mapAlpha",
+			name = "Overlay Alpha",
+			description = "Transparency for the grayscale overlay (0 = fully transparent, 255 = fully opaque)",
+			position = 5,
+			section = worldMapSettings
+	)
+	default int mapAlpha()
+	{
+		return 125;
+	}
+
 }

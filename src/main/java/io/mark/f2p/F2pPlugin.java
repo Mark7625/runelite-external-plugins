@@ -26,13 +26,17 @@ package io.mark.f2p;
 
 import com.google.inject.Provides;
 import io.mark.f2p.config.ActiveType;
+import io.mark.f2p.overlay.WorldMapOverlay;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.IndexedSprite;
+import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ScriptID;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.PostItemComposition;
 import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.WorldChanged;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.callback.ClientThread;
@@ -43,18 +47,19 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.WorldService;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.http.api.worlds.WorldType;
 
 import javax.inject.Inject;
 import java.awt.*;
-import java.awt.image.BufferedImage;
+import java.util.Objects;
 
 @PluginDescriptor(
-	name = "F2P Highlight",
-	description = "Highlight F2P items and areas!",
-	tags = {"f2p","grand exchange"}
+	name = "F2P Utilities",
+	description = "Overlay members items with customizable visual effects (grayscale, outline, or fill)",
+	tags = {"f2p", "members", "items", "overlay", "highlight", "grand exchange"}
 )
-
+@Slf4j
 public class F2pPlugin extends Plugin
 {
 
@@ -82,43 +87,56 @@ public class F2pPlugin extends Plugin
 	@Inject
 	WorldService worldService;
 
+    @Inject
+    private OverlayManager overlayManager;
+
+    @Inject
+    private ItemOverlay overlay;
+
+    @Inject
+    private WorldMapOverlay worldMapOverlay;
+
 	@Subscribe
-	public void onScriptPostFired(ScriptPostFired event)
-	{
-		if (event.getScriptId() == ScriptID.GE_ITEM_SEARCH)
-		{
-			highlightSearchMatches();
+	public void onGameStateChanged(GameStateChanged event) {
+		if (event.getGameState() == GameState.LOGIN_SCREEN || event.getGameState() == GameState.LOGGING_IN) {
+			overlay.invalidateAllCaches();
 		}
 	}
 
+    @Override
+    protected void startUp() {
+        overlayManager.add(overlay);
+        overlayManager.add(worldMapOverlay);
+    }
 
-	public BufferedImage toBufferedImage(IndexedSprite sprite) {
-		BufferedImage image = new BufferedImage(sprite.getWidth(), sprite.getHeight(), 2);
-		toBufferedImage(image, sprite);
-		return image;
-	}
-
-
-	public void toBufferedImage(BufferedImage img, IndexedSprite sprite) throws IllegalArgumentException {
-		int width = sprite.getWidth();
-		int height = sprite.getHeight();
-		int[] pixels = sprite.getPalette();
-		int[] palette = new int[pixels.length];
-		for (int pixel = 0; pixel < pixels.length; pixel++) {
-			if (pixels[pixel] != 0) {
-				palette[pixel] = pixels[pixel] | 0xFF000000;
-			}
-		}
-		img.setRGB(0, 0, width, height, palette, 0, width);
-	}
+    @Override
+    protected void shutDown() {
+        overlayManager.remove(overlay);
+        overlayManager.remove(worldMapOverlay);
+        overlay.invalidateAllCaches();
+        client.getItemCompositionCache().reset();
+    }
 
 	@Subscribe
 	public void onPostItemComposition(PostItemComposition event) {
 		ItemComposition item = event.getItemComposition();
-		if(!item.isMembers() && isActive(config.globalActive()) && config.icon() != -1) {
+		if(item.isMembers() && config.icon() != -1 && isActive()) {
 			event.getItemComposition().setName(formatName(event.getItemComposition().getName()));
 		}
 	}
+
+    @Subscribe
+    public void onWorldChanged(WorldChanged event) {
+        try {
+            if (client == null || worldService == null) {
+                return;
+            }
+            overlay.invalidateAllCaches();
+        } catch (Exception e) {
+            log.warn("Error handling world change", e);
+            overlay.invalidateAllCaches();
+        }
+    }
 
 	private String formatName(String name) {
 		return "<img=" + config.icon() + ">" + name;
@@ -136,60 +154,41 @@ public class F2pPlugin extends Plugin
 		String key = event.getKey();
 
 		switch (key) {
-			case "geresultColor":
-			case "geactive":
-				clientThread.invoke(() -> highlightSearchMatches());
+			case "overlayMode":
+			case "overlayColor":
+			case "overlayAlpha":
+				overlay.invalidateCache();
 			break;
 		}
 
 	}
 
-	public boolean isMembers(int item) {
-		return itemManager.getItemComposition(item).isMembers();
-	}
-
-	private void highlightSearchMatches()
-	{
-
-		if(isActive(config.active())) {
-			Widget results = client.getWidget(WidgetInfo.CHATBOX_GE_SEARCH_RESULTS);
-			Widget[] children = results.getDynamicChildren();
-			int resultCount = children.length / 3;
-
-			for (int i = 0; i < resultCount; i++)
-			{
-				Widget itemNameWidget = children[i * 3 + 1];
-				Widget item = children[i * 3 + 2];
-				if (!isMembers(item.getItemId())) {
-					itemNameWidget.setTextColor(fromRGB(config.textColor()));
-				}
-			}
+	public boolean isActive() {
+        ActiveType type = config.overlayActive();
+		if (type == null) {
+			return false;
 		}
-	}
-
-	public static int fromRGB(Color c)
-	{
-		return fromRGB(c.getRed(), c.getGreen(), c.getBlue());
-	}
-
-	protected static int fromRGB(int r, int g, int b)
-	{
-		return (r << 16) + (g << 8) + b;
-	}
-
-	@Override
-	public void shutDown()
-	{
-		client.getItemCompositionCache().reset();
-	}
-
-	private boolean isActive(ActiveType type) {
-		if(type == ActiveType.ALWAYS) {
+		
+		if (type == ActiveType.ALWAYS) {
 			return true;
 		}
-		if (type == ActiveType.MEMBERS_WORLD) {
-			return worldService.getWorlds().findWorld(client.getWorld()).getTypes().contains(WorldType.MEMBERS);
+		
+		if (type == ActiveType.NEVER) {
+			return false;
 		}
+		
+		if (type == ActiveType.FREE_WORLDS_ONLY) {
+			try {
+				if (client == null || worldService == null) {
+					return false;
+				}
+				int world = client.getWorld();
+				return !Objects.requireNonNull(worldService.getWorlds()).findWorld(world).getTypes().contains(WorldType.MEMBERS);
+			} catch (Exception e) {
+				return false;
+			}
+		}
+		
 		return false;
 	}
 

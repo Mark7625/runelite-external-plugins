@@ -29,8 +29,9 @@ import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum ActiveType {
-    ALWAYS,
-    NEVER,
-    FREE_WORLDS_ONLY
+public enum OverlayMode {
+    BLACK_AND_WHITE,
+    OUTLINE,
+    FILL
 }
+

@@ -36,6 +36,7 @@ import lombok.AccessLevel;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -147,10 +148,19 @@ public class HDMinimapPlugin extends Plugin {
                 } else {
                     clientToolbar.removeNavigation(button);
                 }
+                client.getObjectCompositionCache().reset();
+                reloadGame();
             }
         }
         if (event.getGroup().equals(MapElementManager.CONFIG_GROUP)) {
 			reloadGame();
+        }
+    }
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged gameStateChanged) {
+        if (gameStateChanged.getGameState() == GameState.LOGGED_IN && config.displaySidebar()) {
+            mapElementManager.updateAllIcons();
         }
     }
 

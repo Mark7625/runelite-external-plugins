@@ -10,6 +10,7 @@ import net.runelite.api.ObjectComposition;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
@@ -88,19 +89,31 @@ public class MapElementManager {
         return count;
     }
 
+    public void updateAllIcons() {
+        for (MapElementCategories element : MapElementCategories.values())
+        {
+            MapElementSetting setting = getSetting(element.getDefaultName());
+            if (setting.isDisabled()) {
+                updateIcon(element);
+            }
+        }
+    }
+
 	public void updateIcon(String name)
 	{
-		for (MapElementCategories element : MapElementCategories.values())
+		updateIcon(MapElementCategories.getByDefaultName(name));
+	}
+
+	public void updateIcon(@Nullable MapElementCategories element)
+	{
+		if (element != null)
 		{
-			if (element.getDefaultName().equals(name))
-			{
-				clientThread.invoke(() -> {
-					for (Integer ob : element.getObjectIDs())
-					{
-						processMapElement(element, ob);
-					}
-				});
-			}
+			clientThread.invoke(() -> {
+				for (Integer ob : element.getObjectIDs())
+				{
+					processMapElement(element, ob);
+				}
+			});
 		}
 	}
 

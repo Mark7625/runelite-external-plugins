@@ -26,6 +26,9 @@ package io.mark.hdminimap.mapelement;
 
 import lombok.Getter;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Enum representing different types of map elements that can be managed
  */
@@ -403,6 +406,15 @@ public enum MapElementCategories
 	private final MapElementType type;
 	private final Integer[] objectIDs;
 
+	private static final Map<String, MapElementCategories> BY_DEFAULT_NAME;
+
+	static {
+		BY_DEFAULT_NAME = new HashMap<>();
+		for (MapElementCategories category : values()) {
+			BY_DEFAULT_NAME.put(category.defaultName, category);
+		}
+	}
+
 	MapElementCategories(String defaultName, Integer categoryOrNull, Integer mapID, Integer grouping, MapElementType type, Integer... objectIDs)
 	{
 		this.defaultName = defaultName;
@@ -411,5 +423,9 @@ public enum MapElementCategories
 		this.grouping = grouping;
 		this.type = type;
 		this.objectIDs = objectIDs;
+	}
+
+	public static MapElementCategories getByDefaultName(String name) {
+		return BY_DEFAULT_NAME.get(name);
 	}
 }

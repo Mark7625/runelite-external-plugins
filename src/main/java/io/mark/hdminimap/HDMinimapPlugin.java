@@ -112,7 +112,7 @@ public class HDMinimapPlugin extends Plugin {
 		panel = injector.getInstance(MinimapPanel.class);
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		button = NavigationButton.builder()
-			.tooltip("Custom Maps")
+			.tooltip("HD Minimap")
 			.icon(icon)
 			.priority(3)
 			.panel(panel)

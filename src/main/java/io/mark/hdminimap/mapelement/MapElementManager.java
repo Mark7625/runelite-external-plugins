@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.IndexedSprite;
 import net.runelite.api.ObjectComposition;
+import net.runelite.api.worldmap.MapElementConfig;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 
@@ -42,6 +43,10 @@ public class MapElementManager {
 		BufferedImage image = new BufferedImage(1,1,BufferedImage.TYPE_INT_ARGB);
 		if (type == MapElementType.MAP_FUNCTION)
 		{
+			MapElementConfig mapElementConfig = client.getMapElementConfig(id);
+			if (mapElementConfig.getMapIcon(false) == null) {
+				return null;
+			}
 			image = client.getMapElementConfig(id).getMapIcon(false).toBufferedImage();
 		}
 		else if (type == MapElementType.MAP_SCENERY)

@@ -7,9 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.IndexedSprite;
 import net.runelite.api.ObjectComposition;
+import net.runelite.api.worldmap.MapElementConfig;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
@@ -41,6 +43,10 @@ public class MapElementManager {
 		BufferedImage image = new BufferedImage(1,1,BufferedImage.TYPE_INT_ARGB);
 		if (type == MapElementType.MAP_FUNCTION)
 		{
+			MapElementConfig mapElementConfig = client.getMapElementConfig(id);
+			if (mapElementConfig.getMapIcon(false) == null) {
+				return null;
+			}
 			image = client.getMapElementConfig(id).getMapIcon(false).toBufferedImage();
 		}
 		else if (type == MapElementType.MAP_SCENERY)
@@ -88,19 +94,31 @@ public class MapElementManager {
         return count;
     }
 
+    public void updateAllIcons() {
+        for (MapElementCategories element : MapElementCategories.values())
+        {
+            MapElementSetting setting = getSetting(element.getDefaultName());
+            if (setting.isDisabled()) {
+                updateIcon(element);
+            }
+        }
+    }
+
 	public void updateIcon(String name)
 	{
-		for (MapElementCategories element : MapElementCategories.values())
+		updateIcon(MapElementCategories.getByDefaultName(name));
+	}
+
+	public void updateIcon(@Nullable MapElementCategories element)
+	{
+		if (element != null)
 		{
-			if (element.getDefaultName().equals(name))
-			{
-				clientThread.invoke(() -> {
-					for (Integer ob : element.getObjectIDs())
-					{
-						processMapElement(element, ob);
-					}
-				});
-			}
+			clientThread.invoke(() -> {
+				for (Integer ob : element.getObjectIDs())
+				{
+					processMapElement(element, ob);
+				}
+			});
 		}
 	}
 

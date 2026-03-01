@@ -14,6 +14,12 @@ Remakes 2011 like xp and level up orbs.
 - **Smooth sliding animation** when globes are added or removed (optional)
 - **Customizable appearance**: scale, spacing, duration, fade effects
 
+### XP Drop Popups
+- **Floating XP popups** displayed at the center of the screen when you gain experience
+- **Animated movement** as popups rise and fade
+- **Optional skill icons** shown next to the XP amount
+- **Customizable**: speed, font color, scale, offset, and background box for visibility
+
 ### Level-Up Popups
 - **Classic 2011-style level-up notifications** with animated globe
 - **Gold orbs** for level 99+ achievements

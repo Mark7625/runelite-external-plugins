@@ -1,9 +1,11 @@
 package io.mark.globes;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
 /**
@@ -12,28 +14,28 @@ import net.runelite.client.config.Units;
 @ConfigGroup(RemasteredXpGlobesConfig.CONFIG_GROUP)
 public interface RemasteredXpGlobesConfig extends Config {
 
-    String CONFIG_GROUP = "remasteredxpglobes";
+	String CONFIG_GROUP = "remasteredxpglobes";
 
 	@ConfigSection(
-		name = "Global",
-		description = "General settings.",
-		position = 0
+			name = "Global",
+			description = "General settings.",
+			position = 0
 	)
 	String globalSection = "global";
 
 	@ConfigSection(
-		name = "Progress orbs",
-		description = "XP progress orb settings.",
-		closedByDefault = true,
-		position = 1
+			name = "Progress orbs",
+			description = "XP progress orb settings.",
+			closedByDefault = true,
+			position = 1
 	)
 	String progressOrbsSection = "progressOrbs";
 
 	@ConfigSection(
-		name = "Level up orbs",
-		description = "Level-up orb settings.",
-		closedByDefault = true,
-		position = 2
+			name = "Level up orbs",
+			description = "Level-up orb settings.",
+			closedByDefault = true,
+			position = 2
 	)
 	String levelUpOrbsSection = "levelUpOrbs";
 
@@ -44,6 +46,14 @@ public interface RemasteredXpGlobesConfig extends Config {
 			position = 3
 	)
 	String xpTooltipSection = "xpOrbsTooltips";
+
+	@ConfigSection(
+			name = "XP drop popups",
+			description = "Floating XP popup that appears from center of screen.",
+			closedByDefault = true,
+			position = 4
+	)
+	String xpDropsSection = "xpDrops";
 
 	@ConfigItem(
 			keyName = "hideMaxed",
@@ -92,6 +102,18 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
+			keyName = "overlayFont",
+			name = "Overlay font",
+			description = "Font used for XP popups, level up text, and orb percent on hover.",
+			section = globalSection,
+			position = 5
+	)
+	default OverlayFontType overlayFont()
+	{
+		return OverlayFontType.RUNESCAPE;
+	}
+
+	@ConfigItem(
 			keyName = "verticalOffset",
 			name = "Vertical offset",
 			description = "Offset all globes down from the top of the screen.",
@@ -102,6 +124,95 @@ public interface RemasteredXpGlobesConfig extends Config {
 	default int verticalOffset()
 	{
 		return 0;
+	}
+
+	@ConfigItem(
+			keyName = "enableXpDrops",
+			name = "Enable XP drop popups",
+			description = "Shows the floating XP popup below the middle orb when you gain experience.",
+			section = xpDropsSection,
+			position = 0
+	)
+	default boolean enableXpDrops()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "xpDropSpeed",
+			name = "XP drop speed",
+			description = "Speed at which the XP popup moves up (pixels per second).",
+			section = xpDropsSection,
+			position = 1
+	)
+	@Range(min = 20, max = 150)
+	default int xpDropSpeed()
+	{
+		return 80;
+	}
+
+	@ConfigItem(
+			keyName = "xpDropShowIcons",
+			name = "Show skill icons",
+			description = "Show skill icons next to the XP amount.",
+			section = xpDropsSection,
+			position = 2
+	)
+	default boolean xpDropShowIcons()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "xpDropFontColor",
+			name = "Font color",
+			description = "Color of the XP text.",
+			section = xpDropsSection,
+			position = 3
+	)
+	default Color xpDropFontColor()
+	{
+		return Color.decode("#E4A63E");
+	}
+
+	@ConfigItem(
+			keyName = "xpDropScale",
+			name = "Scale",
+			description = "Scale of the XP popup.",
+			section = xpDropsSection,
+			position = 4
+	)
+	@Range(min = 50, max = 150)
+	@Units(Units.PERCENT)
+	default int xpDropScale()
+	{
+		return 140;
+	}
+
+	@ConfigItem(
+			keyName = "xpDropOffset",
+			name = "Offset below orb",
+			description = "Pixels below the middle orb where the XP drop appears.",
+			section = xpDropsSection,
+			position = 5
+	)
+	@Range(min = 0, max = 200)
+	@Units(Units.PIXELS)
+	default int xpDropOffset()
+	{
+		return 100;
+	}
+
+	@ConfigItem(
+			keyName = "xpDropShowBackground",
+			name = "Show background box",
+			description = "Draws a dark box behind the XP drop text for better visibility.",
+			section = xpDropsSection,
+			position = 6
+	)
+	default boolean xpDropShowBackground()
+	{
+		return false;
 	}
 
 	@ConfigItem(
@@ -142,16 +253,16 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "orbScale",
+			keyName = "orbScale1",
 			name = "Orb scale",
-			description = "Scale the XP orbs size (default 100% = 57x56).",
+			description = "Scale the XP orbs size. (default = 27)",
 			section = progressOrbsSection,
 			position = 23
 	)
 	@Units(Units.PERCENT)
 	default int orbScale()
 	{
-		return 100;
+		return 27;
 	}
 
 	@ConfigItem(
@@ -221,7 +332,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	@ConfigItem(
 			keyName = "levelUpScale",
 			name = "Level up scale",
-			description = "Scale the level up globe size (default 100% = 144x98).",
+			description = "Scale the level up globe size.",
 			section = levelUpOrbsSection,
 			position = 29
 	)
@@ -305,8 +416,8 @@ public interface RemasteredXpGlobesConfig extends Config {
 
 	@ConfigItem(
 			keyName = "showXpLeft",
-			name = "Show XP left",
-			description = "Shows XP left inside the globe tooltip box.",
+			name = "Show until goal",
+			description = "Shows XP remaining until goal in the globe tooltip.",
 			position = 1,
 			section = xpTooltipSection
 	)
@@ -349,6 +460,42 @@ public interface RemasteredXpGlobesConfig extends Config {
 	default boolean showTimeTilGoal()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+			keyName = "showGoalInfo",
+			name = "Show goal XP",
+			description = "Shows Goal XP and Until goal when a goal is set.",
+			position = 5,
+			section = xpTooltipSection
+	)
+	default boolean showGoalInfo()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "showGoalBar",
+			name = "Show goal progress bar",
+			description = "Shows a progress bar for goal completion.",
+			position = 6,
+			section = xpTooltipSection
+	)
+	default boolean showGoalBar()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "useCompactNumbers",
+			name = "Compact number format",
+			description = "Use compact format for numbers (e.g. 1.2M instead of 1,200,000).",
+			position = 7,
+			section = xpTooltipSection
+	)
+	default boolean useCompactNumbers()
+	{
+		return false;
 	}
 
 }

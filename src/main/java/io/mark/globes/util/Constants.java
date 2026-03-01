@@ -3,11 +3,65 @@ package io.mark.globes.util;
 import com.google.common.collect.ImmutableMap;
 import net.runelite.api.Skill;
 import net.runelite.api.gameval.SpriteID;
+import net.runelite.api.gameval.VarPlayerID;
 
 import java.util.Map;
 
 public final class Constants {
 
+	public static final Map<Skill, Integer> SKILL_GOAL_START_VARP = ImmutableMap.<Skill, Integer>builder()
+			.put(Skill.ATTACK, VarPlayerID.XPDROPS_ATTACK_START)
+			.put(Skill.STRENGTH, VarPlayerID.XPDROPS_STRENGTH_START)
+			.put(Skill.RANGED, VarPlayerID.XPDROPS_RANGED_START)
+			.put(Skill.MAGIC, VarPlayerID.XPDROPS_MAGIC_START)
+			.put(Skill.DEFENCE, VarPlayerID.XPDROPS_DEFENCE_START)
+			.put(Skill.HITPOINTS, VarPlayerID.XPDROPS_HITPOINTS_START)
+			.put(Skill.PRAYER, VarPlayerID.XPDROPS_PRAYER_START)
+			.put(Skill.AGILITY, VarPlayerID.XPDROPS_AGILITY_START)
+			.put(Skill.HERBLORE, VarPlayerID.XPDROPS_HERBLORE_START)
+			.put(Skill.THIEVING, VarPlayerID.XPDROPS_THIEVING_START)
+			.put(Skill.CRAFTING, VarPlayerID.XPDROPS_CRAFTING_START)
+			.put(Skill.RUNECRAFT, VarPlayerID.XPDROPS_RUNECRAFT_START)
+			.put(Skill.MINING, VarPlayerID.XPDROPS_MINING_START)
+			.put(Skill.SMITHING, VarPlayerID.XPDROPS_SMITHING_START)
+			.put(Skill.FISHING, VarPlayerID.XPDROPS_FISHING_START)
+			.put(Skill.COOKING, VarPlayerID.XPDROPS_COOKING_START)
+			.put(Skill.FIREMAKING, VarPlayerID.XPDROPS_FIREMAKING_START)
+			.put(Skill.WOODCUTTING, VarPlayerID.XPDROPS_WOODCUTTING_START)
+			.put(Skill.FLETCHING, VarPlayerID.XPDROPS_FLETCHING_START)
+			.put(Skill.SLAYER, VarPlayerID.XPDROPS_SLAYER_START)
+			.put(Skill.FARMING, VarPlayerID.XPDROPS_FARMING_START)
+			.put(Skill.CONSTRUCTION, VarPlayerID.XPDROPS_CONSTRUCTION_START)
+			.put(Skill.HUNTER, VarPlayerID.XPDROPS_HUNTER_START)
+			.put(Skill.SAILING, VarPlayerID.XPDROPS_SAILING_START)
+			.build();
+
+	public static final Map<Skill, Integer> SKILL_GOAL_END_VARP = ImmutableMap.<Skill, Integer>builder()
+			.put(Skill.ATTACK, VarPlayerID.XPDROPS_ATTACK_END)
+			.put(Skill.STRENGTH, VarPlayerID.XPDROPS_STRENGTH_END)
+			.put(Skill.RANGED, VarPlayerID.XPDROPS_RANGED_END)
+			.put(Skill.MAGIC, VarPlayerID.XPDROPS_MAGIC_END)
+			.put(Skill.DEFENCE, VarPlayerID.XPDROPS_DEFENCE_END)
+			.put(Skill.HITPOINTS, VarPlayerID.XPDROPS_HITPOINTS_END)
+			.put(Skill.PRAYER, VarPlayerID.XPDROPS_PRAYER_END)
+			.put(Skill.AGILITY, VarPlayerID.XPDROPS_AGILITY_END)
+			.put(Skill.HERBLORE, VarPlayerID.XPDROPS_HERBLORE_END)
+			.put(Skill.THIEVING, VarPlayerID.XPDROPS_THIEVING_END)
+			.put(Skill.CRAFTING, VarPlayerID.XPDROPS_CRAFTING_END)
+			.put(Skill.RUNECRAFT, VarPlayerID.XPDROPS_RUNECRAFT_END)
+			.put(Skill.MINING, VarPlayerID.XPDROPS_MINING_END)
+			.put(Skill.SMITHING, VarPlayerID.XPDROPS_SMITHING_END)
+			.put(Skill.FISHING, VarPlayerID.XPDROPS_FISHING_END)
+			.put(Skill.COOKING, VarPlayerID.XPDROPS_COOKING_END)
+			.put(Skill.FIREMAKING, VarPlayerID.XPDROPS_FIREMAKING_END)
+			.put(Skill.WOODCUTTING, VarPlayerID.XPDROPS_WOODCUTTING_END)
+			.put(Skill.FLETCHING, VarPlayerID.XPDROPS_FLETCHING_END)
+			.put(Skill.SLAYER, VarPlayerID.XPDROPS_SLAYER_END)
+			.put(Skill.FARMING, VarPlayerID.XPDROPS_FARMING_END)
+			.put(Skill.CONSTRUCTION, VarPlayerID.XPDROPS_CONSTRUCTION_END)
+			.put(Skill.HUNTER, VarPlayerID.XPDROPS_HUNTER_END)
+			.put(Skill.SAILING, VarPlayerID.XPDROPS_SAILING_END)
+			.build();
 
 	public static final Map<Skill, Integer> SKILL_BITS = ImmutableMap.<Skill, Integer>builder()
 			.put(Skill.ATTACK, 1)

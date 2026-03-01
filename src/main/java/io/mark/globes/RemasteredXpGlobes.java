@@ -50,6 +50,7 @@ public class RemasteredXpGlobes extends Plugin {
 	private final int[] previousLevels = new int[Skill.values().length];
 	private boolean levelsInitialized;
 	private Instant levelsInitializedTime;
+	private long xpDropSyncPendingTime = 0;
 
 	@Getter
 	private final List<XpGlobe> xpGlobes = new ArrayList<>();
@@ -106,6 +107,7 @@ public class RemasteredXpGlobes extends Plugin {
 	public void shutDown() {
 		resetGlobeState();
 		overlay.clearCache();
+		overlay.clearXpDrops();
 		levelUpOverlay.clearCache();
 		overlayManager.remove(overlay);
 		overlayManager.remove(levelUpOverlay);
@@ -118,6 +120,8 @@ public class RemasteredXpGlobes extends Plugin {
 		int currentLevel = statChanged.getLevel();
 		int skillIdx = skill.ordinal();
 		Instant now = Instant.now();
+
+		overlay.onStatChanged(skill, currentXp);
 
 		if (!levelsInitialized) {
 			return;
@@ -220,6 +224,11 @@ public class RemasteredXpGlobes extends Plugin {
 
 	@Schedule(period = 1, unit = ChronoUnit.SECONDS)
 	public void removeExpiredXpGlobes() {
+		if (xpDropSyncPendingTime > 0 && System.currentTimeMillis() - xpDropSyncPendingTime >= 1500) {
+			overlay.syncPreviousXpFromClient();
+			xpDropSyncPendingTime = 0;
+		}
+
 		if (!xpGlobes.isEmpty()) {
 			Instant expireTime = Instant.now().minusSeconds(config.xpOrbDuration());
 			xpGlobes.removeIf(globe -> globe.getTime().isBefore(expireTime));
@@ -267,9 +276,13 @@ public class RemasteredXpGlobes extends Plugin {
 			case HOPPING:
 			case LOGGING_IN:
 				resetGlobeState();
+				overlay.clearXpDrops();
+				xpDropSyncPendingTime = 0;
 				break;
 			case LOGGED_IN:
 				initializePreviousLevels();
+				overlay.initPreviousXp();
+				xpDropSyncPendingTime = System.currentTimeMillis();
 				break;
 		}
 	}
@@ -281,7 +294,7 @@ public class RemasteredXpGlobes extends Plugin {
 		String command = commandExecuted.getCommand();
 		if (CMD_TEST_ORB.equals(command) && developerMode) {
 			Skill randomSkill;
-			if (args != null) {
+			if (args.length == 1) {
 				String skillName = args[0].toUpperCase();
 				randomSkill = Skill.valueOf(skillName.toUpperCase());
 			} else  {

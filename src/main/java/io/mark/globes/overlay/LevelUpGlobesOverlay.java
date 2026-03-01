@@ -3,6 +3,7 @@ package io.mark.globes.overlay;
 import io.mark.globes.RemasteredXpGlobes;
 import io.mark.globes.RemasteredXpGlobesConfig;
 import io.mark.globes.model.LevelUpGlobe;
+import io.mark.globes.OverlayFontType;
 import io.mark.globes.util.Constants;
 import io.mark.globes.util.ImageCache;
 import net.runelite.api.Client;
@@ -227,6 +228,11 @@ public class LevelUpGlobesOverlay extends Overlay {
 			alpha = 1.0f;
 		}
 
+		float fontSize = (float) (config.overlayFont().getFont().getSize2D() * Math.max(0.5, scalePercent / 100.0));
+		Font font = config.overlayFont().getFont().deriveFont(fontSize);
+		Font oldFont = graphics.getFont();
+		graphics.setFont(font);
+
 		FontMetrics fm = graphics.getFontMetrics();
 		int textWidth = fm.stringWidth(message);
 		int textHeight = fm.getHeight();
@@ -261,6 +267,7 @@ public class LevelUpGlobesOverlay extends Overlay {
 		graphics.setColor(Color.WHITE);
 		graphics.drawString(message, textX, textY + 1);
 
+		graphics.setFont(oldFont);
 		graphics.setComposite(old);
 	}
 

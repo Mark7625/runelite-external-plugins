@@ -6,8 +6,10 @@ import com.google.inject.Inject;
 import io.mark.f2p.config.OverlayMode;
 import io.mark.f2p.overlay.CacheKey;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Point;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.WidgetItemOverlay;
 
 import java.awt.*;
@@ -51,6 +53,9 @@ public class ItemOverlay extends WidgetItemOverlay {
         if (!isMembers(itemId)) {
             return;
         }
+        if (isExcluded(itemId)) {
+            return;
+        }
 
         OverlayMode mode = config.overlayMode();
         Rectangle bounds = widgetItem.getCanvasBounds();
@@ -67,9 +72,36 @@ public class ItemOverlay extends WidgetItemOverlay {
             if (cachedImage != null) {
                 graphics.drawImage(cachedImage, (int) bounds.getX(), (int) bounds.getY(), null);
             }
+            int quantity = widgetItem.getQuantity();
+            if (quantity > 1) {
+                String quantityStr = formatQuantity(quantity);
+                Color quantityColor = getQuantityColor(quantity);
+                Point point = new Point((int) bounds.getX(), (int) bounds.getY() + 10);
+                OverlayUtil.renderTextLocation(graphics, point, quantityStr, quantityColor);
+            }
         } catch (ExecutionException e) {
             log.info("Unable to Render item: " + itemId);
         }
+    }
+
+    private String formatQuantity(int quantity) {
+        if (quantity < 100_000) {
+            return String.valueOf(quantity);
+        }
+        if (quantity < 10_000_000) {
+            return quantity / 1000 + "K";
+        }
+        return quantity / 1_000_000 + "M";
+    }
+
+    private Color getQuantityColor(int quantity) {
+        if (quantity < 100_000) {
+            return Color.decode("#ffff00");
+        }
+        if (quantity < 10_000_000) {
+            return Color.decode("#ffffff");
+        }
+        return Color.decode("#00ff80");
     }
 
     private boolean isMembers(int itemId) {
@@ -86,6 +118,10 @@ public class ItemOverlay extends WidgetItemOverlay {
             log.warn("Error getting members status from cache for item: " + itemId, e);
             return false;
         }
+    }
+
+    public boolean isExcluded(int itemId) {
+        return plugin.getExcludedItemIds().contains(itemId);
     }
 
     private BufferedImage getCachedImage(int itemId, int quantity, OverlayMode mode, Color color) throws ExecutionException {

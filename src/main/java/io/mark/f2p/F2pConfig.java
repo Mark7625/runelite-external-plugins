@@ -107,6 +107,18 @@ public interface F2pConfig extends Config
 		return 125;
 	}
 
+	@ConfigItem(
+			keyName = "excludeKeybind",
+			name = "Exclude Keybind",
+			description = "Hold this key and right-click an item to add Exclude/Include options to the menu",
+			position = 5,
+			section = itemOverlaySettings
+	)
+	default Keybind excludeKeybind()
+	{
+		return Keybind.SHIFT;
+	}
+
 	@ConfigSection(
 			name = "World Map",
 			description = "World Map Overlay Settings",

@@ -1,24 +1,22 @@
 package io.mark.globes.model.skill;
 
-import io.mark.globes.util.Constants;
 import net.runelite.api.Client;
+import net.runelite.api.EnumID;
 import net.runelite.api.Skill;
+import net.runelite.api.gameval.DBTableID;
 import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Singleton
 public class SkillData {
-	private static final int GUIDE_SCRIPT_ID = 661;
-	private static final int GUIDE_SUB_SECTION_SCRIPT_ID = 660;
 
-	private final Map<Skill, List<SkillGuideEntry>> skillToEntries = new HashMap<>();
+	private final List<SkillFeature> features = new ArrayList<>();
 
 	@Inject
 	private ClientThread clientThread;
@@ -31,74 +29,84 @@ public class SkillData {
 	}
 
 	private void loadInternal() {
-		skillToEntries.clear();
-		for (Skill skill : Constants.SKILL_BITS.keySet()) {
-			skillToEntries.put(skill, new ArrayList<>());
-		}
+		features.clear();
 
-		Map<Skill, List<Integer>> skillCategories = new HashMap<>();
-		for (Map.Entry<Skill, Integer> e : Constants.SKILL_BITS.entrySet()) {
-			Skill skill = e.getKey();
-			int bit = e.getValue();
+		Map<Integer, Skill> skillMap = new HashMap<>();
 
-			List<Integer> categories = new ArrayList<>();
-			for (int catIndex = 1; catIndex < 30; catIndex++) {
-				client.runScript(GUIDE_SUB_SECTION_SCRIPT_ID, bit, catIndex);
-				int[] intStack = client.getIntStack();
-				if (intStack != null && intStack.length > 0 && intStack[0] != -1) {
-					categories.add(catIndex);
-				}
+		var enum81 = client.getEnum(81);
+		var enum680 = client.getEnum(680);
+
+		for (int key : enum81.getIntVals()) {
+
+			String skillName = enum680.getStringValue(key);
+
+			if (skillName != null && !skillName.equalsIgnoreCase("SKILL")) {
+				skillMap.put(enum81.getIntValue(key), Skill.valueOf(skillName.toUpperCase()));
 			}
-			skillCategories.put(skill, categories);
 		}
 
-		for (Map.Entry<Skill, Integer> e : Constants.SKILL_BITS.entrySet()) {
-			Skill skill = e.getKey();
-			int bit = e.getValue();
-			List<Integer> categories = skillCategories.get(skill);
-			if (categories == null) {
+		for (Integer dbTableRow : client.getDBTableRows(DBTableID.SkillFeatures.ID)) {
+			String unlockDesc = (String) client.getDBTableField(dbTableRow, DBTableID.SkillFeatures.COL_TEXT, 0)[0];
+			boolean members = (Integer) client.getDBTableField(dbTableRow, DBTableID.SkillFeatures.COL_MEMBERSONLY, 0)[0] == 1;
+			Integer iconId = (Integer) client.getDBTableField(dbTableRow, DBTableID.SkillFeatures.COL_ICON, 0)[0];
+
+			int itemId = (iconId != null && iconId >= 0) ? iconId : -1;
+
+			Object[] stats = client.getDBTableField(dbTableRow, DBTableID.SkillFeatures.COL_SKILL, 0);
+			Object[] levels = client.getDBTableField(dbTableRow, DBTableID.SkillFeatures.COL_SKILL, 1);
+
+			if (stats == null || levels == null) {
 				continue;
 			}
 
-			List<SkillGuideEntry> entries = skillToEntries.get(skill);
-			if (entries == null) {
-				continue;
-			}
-
-			for (int category : categories) {
-				for (int index = 0; index < 160; index++) {
-					client.runScript(GUIDE_SCRIPT_ID, bit, category, index);
-					int[] intStack = client.getIntStack();
-					if (intStack == null || intStack.length < 2) {
-						continue;
-					}
-
-					int level = intStack[0];
-					if (level == -1) {
-						continue;
-					}
-
-					int itemId = intStack[1];
-					Object[] objectStack = client.getObjectStack();
-					Object raw = (objectStack != null && objectStack.length > 0) ? objectStack[0] : null;
-					String rawDescription = raw != null ? raw.toString() : "";
-					boolean members = rawDescription.contains("Members:");
-
-					entries.add(new SkillGuideEntry(skill, level, itemId, rawDescription, members));
+			Map<Skill, Integer> requirements = new HashMap<>();
+			for (int i = 0; i < stats.length && i < levels.length; i++) {
+				Skill skill = skillMap.get((int) stats[i]);
+				Integer level = (Integer) levels[i];
+				if (skill == null || level == null) {
+					continue;
 				}
+				requirements.put(skill, level);
+			}
+			if (!requirements.isEmpty()) {
+				features.add(new SkillFeature(unlockDesc != null ? unlockDesc : "", members, itemId, requirements));
 			}
 		}
 	}
 
-	public List<SkillGuideEntry> getEntriesForSkill(Skill skill) {
-		return skillToEntries.getOrDefault(skill, Collections.emptyList());
-	}
-
-	public List<SkillGuideEntry> getEntriesForLevel(Skill skill, int level) {
-		List<SkillGuideEntry> out = new ArrayList<>();
-		for (SkillGuideEntry e : getEntriesForSkill(skill)) {
-			if (e.getLevel() == level) {
-				out.add(e);
+	/**
+	 * Returns skill features for the given skill/level.
+	 *
+	 * @param requireAllLevels when true, only include features where the player meets every level requirement;
+	 *                        when false, include when the player meets at least one requirement.
+	 */
+	public List<SkillFeature> getEntriesForLevel(Skill skill, int level, Map<Skill, Integer> playerLevels, boolean requireAllLevels) {
+		List<SkillFeature> out = new ArrayList<>();
+		for (SkillFeature feature : features) {
+			Integer requiredLevel = feature.getRequirements().get(skill);
+			if (requiredLevel == null || requiredLevel != level) {
+				continue;
+			}
+			boolean include;
+			if (requireAllLevels) {
+				include = true;
+				for (Map.Entry<Skill, Integer> req : feature.getRequirements().entrySet()) {
+					if (playerLevels.getOrDefault(req.getKey(), 0) < req.getValue()) {
+						include = false;
+						break;
+					}
+				}
+			} else {
+				include = false;
+				for (Map.Entry<Skill, Integer> req : feature.getRequirements().entrySet()) {
+					if (playerLevels.getOrDefault(req.getKey(), 0) >= req.getValue()) {
+						include = true;
+						break;
+					}
+				}
+			}
+			if (include) {
+				out.add(feature);
 			}
 		}
 		return out;

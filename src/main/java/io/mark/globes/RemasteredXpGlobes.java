@@ -152,9 +152,10 @@ public class RemasteredXpGlobes extends Plugin {
 					skillData,
 					previousLevel,
 					config.maxMilestones(),
-					config.showQuestRequirementsMet(),
-					config.showAllQuestRequirementsMet(),
-					config.showSkillLevelUps()
+					config.questRequirementMode(),
+					config.skillUnlockRequirementMode(),
+					config.showSkillLevelUps(),
+					playerLevels
 			);
 			levelUpQueue.add(levelUp);
 			processLevelUpQueue();
@@ -247,7 +248,7 @@ public class RemasteredXpGlobes extends Plugin {
 	private long getLevelUpDurationSeconds(LevelUpGlobe levelUp) {
 		int maxMilestones = 0;
 		if (config.showMilestones() && levelUp.getMilestones() != null) {
-			maxMilestones = Math.min(config.maxMilestones(), levelUp.getMilestones().length);
+			maxMilestones = Math.min(config.maxMilestones(), levelUp.getMilestones().size());
 		}
 		return (3300 + maxMilestones * 3000L + 2000) / 1000;
 	}
@@ -329,7 +330,7 @@ public class RemasteredXpGlobes extends Plugin {
 
 				LevelUpGlobe levelUp = new LevelUpGlobe(skill, level, Instant.now(), questUnlockResult, skillData,
 						previousLevel, config.maxMilestones(),
-						config.showQuestRequirementsMet(), config.showAllQuestRequirementsMet(), config.showSkillLevelUps());
+						config.questRequirementMode(), config.skillUnlockRequirementMode(), config.showSkillLevelUps(), playerLevels);
 				levelUpQueue.add(levelUp);
 				processLevelUpQueue();
 			} catch (IllegalArgumentException ignored) {

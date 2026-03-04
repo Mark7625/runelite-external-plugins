@@ -4,11 +4,14 @@ import io.mark.globes.RemasteredXpGlobes;
 import io.mark.globes.RemasteredXpGlobesConfig;
 import io.mark.globes.model.LevelUpGlobe;
 import io.mark.globes.OverlayFontType;
+import io.mark.globes.model.MilestoneDisplay;
 import io.mark.globes.util.Constants;
 import io.mark.globes.util.ImageCache;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.api.SpritePixels;
+import net.runelite.api.gameval.SpriteID;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -50,13 +53,22 @@ public class LevelUpGlobesOverlay extends Overlay {
 	private final RemasteredXpGlobesConfig config;
 	private final Client client;
 	private final SpriteManager spriteManager;
+	private final ItemManager itemManager;
+
+	private static final int MILESTONE_ICON_SIZE = 18;
+	private static final int MILESTONE_QUEST_ICON_SIZE = 14;
+	private static final int MILESTONE_ICON_TEXT_GAP = 8;
+	private static final int MILESTONE_ICON_CONTENT_PADDING = 28;
+
+	private BufferedImage cachedQuestIcon;
 
 	@Inject
-	public LevelUpGlobesOverlay(RemasteredXpGlobes plugin, RemasteredXpGlobesConfig config, Client client, SpriteManager spriteManager) {
+	public LevelUpGlobesOverlay(RemasteredXpGlobes plugin, RemasteredXpGlobesConfig config, Client client, SpriteManager spriteManager, ItemManager itemManager) {
 		this.plugin = plugin;
 		this.config = config;
 		this.client = client;
 		this.spriteManager = spriteManager;
+		this.itemManager = itemManager;
 		setPosition(OverlayPosition.TOP_CENTER);
 		this.silverLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_silver/level_up_", FRAME_COUNT, 144, 98);
 		this.goldLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_gold/level_up_", FRAME_COUNT, 144, 98);
@@ -69,6 +81,7 @@ public class LevelUpGlobesOverlay extends Overlay {
 		silverLevelUpImageCache.clearCache();
 		goldLevelUpImageCache.clearCache();
 		numberImageCache.clearCache();
+		cachedQuestIcon = null;
 
 		baseMilestoneLeft = null;
 		baseMilestoneMiddle = null;
@@ -121,7 +134,7 @@ public class LevelUpGlobesOverlay extends Overlay {
 		long elapsedMillis = Duration.between(currentLevelUp.getTime(), Instant.now()).toMillis();
 		int maxMilestones = 0;
 		if (config.showMilestones() && currentLevelUp.getMilestones() != null) {
-			maxMilestones = Math.min(config.maxMilestones(), currentLevelUp.getMilestones().length);
+			maxMilestones = Math.min(config.maxMilestones(), currentLevelUp.getMilestones().size());
 		}
 		
 		long fadeStartMillis;
@@ -182,7 +195,7 @@ public class LevelUpGlobesOverlay extends Overlay {
 	}
 
 	private void updateMilestoneState(LevelUpGlobe levelUp) {
-		if (levelUp.getMilestones() == null || levelUp.getMilestones().length == 0) return;
+		if (levelUp.getMilestones() == null || levelUp.getMilestones().isEmpty()) return;
 		if (lastLevelUpGlobe != levelUp) {
 			currentMilestoneIndex = 0;
 			currentMilestoneStartTime = null;
@@ -194,7 +207,7 @@ public class LevelUpGlobesOverlay extends Overlay {
 			currentMilestoneStartTime = Instant.ofEpochMilli(levelUp.getTime().toEpochMilli() + MILESTONE_START_DELAY_MILLIS);
 			return;
 		}
-		int max = Math.min(config.maxMilestones(), levelUp.getMilestones().length);
+		int max = Math.min(config.maxMilestones(), levelUp.getMilestones().size());
 		if (currentMilestoneIndex >= max) return;
 		long milestoneElapsed = Duration.between(currentMilestoneStartTime, Instant.now()).toMillis();
 		if (milestoneElapsed >= MILESTONE_DISPLAY_MILLIS) {
@@ -204,11 +217,26 @@ public class LevelUpGlobesOverlay extends Overlay {
 	}
 
 	private void drawMilestoneMessage(Graphics2D graphics, LevelUpGlobe levelUp, int orbX, int orbY, int orbWidth, int orbHeight, int scalePercent) {
-		if (levelUp.getMilestones() == null || levelUp.getMilestones().length == 0) return;
-		int max = Math.min(config.maxMilestones(), levelUp.getMilestones().length);
+		if (levelUp.getMilestones() == null || levelUp.getMilestones().isEmpty()) return;
+		int max = Math.min(config.maxMilestones(), levelUp.getMilestones().size());
 		if (currentMilestoneIndex >= max || scaledMilestoneLeft == null) return;
-		String message = levelUp.getMilestones()[currentMilestoneIndex];
+		MilestoneDisplay milestone = levelUp.getMilestones().get(currentMilestoneIndex);
+		String message = milestone.getMessage();
 		if (message == null || message.isEmpty()) return;
+		message = stripAfterBr(message);
+		if (message.isEmpty()) return;
+
+		int iconItemId = milestone.getIconItemId();
+		boolean showIcon = config.showMilestoneIcons() && iconItemId != -1;
+		int iconSize = (iconItemId == MilestoneDisplay.QUEST_ICON_ID) ? MILESTONE_QUEST_ICON_SIZE : MILESTONE_ICON_SIZE;
+		BufferedImage iconImage = null;
+		if (showIcon) {
+			if (iconItemId == MilestoneDisplay.QUEST_ICON_ID) {
+				iconImage = getQuestIcon();
+			} else {
+				iconImage = itemManager.getImage(iconItemId);
+			}
+		}
 
 		long milestoneElapsed = currentMilestoneStartTime == null ? 0 : Duration.between(currentMilestoneStartTime, Instant.now()).toMillis();
 		float alpha;
@@ -239,8 +267,12 @@ public class LevelUpGlobesOverlay extends Overlay {
 		int middleW = scaledMilestoneMiddle.getWidth();
 		int leftW = scaledMilestoneLeft.getWidth();
 		int rightW = scaledMilestoneRight.getWidth();
-		int targetBgWidth = textWidth + 40;
-		int middleNeeded = Math.max(0, targetBgWidth - leftW - rightW);
+		// With icon: use symmetric padding so icon+text block is centered; without: text + 40 as before
+		final int contentPadding = showIcon ? MILESTONE_ICON_CONTENT_PADDING : 20;
+		int contentWidth = showIcon
+				? iconSize + MILESTONE_ICON_TEXT_GAP + textWidth + contentPadding
+				: textWidth + 40;
+		int middleNeeded = Math.max(0, contentWidth - leftW - rightW);
 		int middleCount = Math.max(1, (int) Math.ceil((double) middleNeeded / middleW));
 		int bgWidth = leftW + middleW * middleCount + rightW;
 		int bgHeight = scaledMilestoneLeft.getHeight();
@@ -262,10 +294,28 @@ public class LevelUpGlobesOverlay extends Overlay {
 		}
 		graphics.drawImage(scaledMilestoneRight, cx, milestoneY, null);
 
-		int textX = milestoneX + leftW + (middleW * middleCount - textWidth) / 2;
-		int textY = milestoneY + (bgHeight / 2) + (textHeight / 4);
+		// Center the content block (icon + text, or text only) horizontally in the bar
+		int contentStartX = milestoneX + (bgWidth - contentWidth) / 2;
+		int textX;
+		int iconX;
+		if (showIcon) {
+			int leftPad = contentPadding / 2;
+			iconX = contentStartX + leftPad;
+			textX = iconX + iconSize + MILESTONE_ICON_TEXT_GAP;
+		} else {
+			iconX = contentStartX;
+			// No icon: center text in the bar (content is text + padding only)
+			textX = contentStartX + (contentWidth - textWidth) / 2;
+		}
+		// Center icon and text vertically in the bar
+		int iconY = milestoneY + (bgHeight - iconSize) / 2;
+		int textY = milestoneY + (bgHeight - textHeight) / 2 + fm.getAscent();
+
+		if (showIcon && iconImage != null) {
+			graphics.drawImage(iconImage, iconX, iconY, iconSize, iconSize, null);
+		}
 		graphics.setColor(Color.WHITE);
-		graphics.drawString(message, textX, textY + 1);
+		graphics.drawString(message, textX, textY);
 
 		graphics.setFont(oldFont);
 		graphics.setComposite(old);
@@ -342,6 +392,15 @@ public class LevelUpGlobesOverlay extends Overlay {
 		}
 	}
 
+	private static String stripAfterBr(String message) {
+		if (message == null) return "";
+		int i = message.indexOf("<br>");
+		if (i < 0) i = message.indexOf("<br/>");
+		if (i < 0) i = message.indexOf("<br />");
+		if (i < 0) i = message.indexOf("<BR>");
+		return i >= 0 ? message.substring(0, i).trim() : message;
+	}
+
 	private BufferedImage getSkillImage(Skill skill) {
 		int iconID = Constants.SKILL_ICONS.get(skill);
 		SpritePixels spriteIcon = client.getSpriteOverrides().get(iconID);
@@ -349,6 +408,20 @@ public class LevelUpGlobesOverlay extends Overlay {
 			return spriteIcon.toBufferedImage();
 		}
 		return spriteManager.getSprite(iconID, 0);
+	}
+
+	private BufferedImage getQuestIcon() {
+		if (cachedQuestIcon != null) {
+			return cachedQuestIcon;
+		}
+		int iconID = SpriteID.SideIcons.QUEST;
+		SpritePixels spriteIcon = client.getSpriteOverrides().get(iconID);
+		if (spriteIcon != null) {
+			cachedQuestIcon = spriteIcon.toBufferedImage();
+		} else {
+			cachedQuestIcon = spriteManager.getSprite(iconID, 0);
+		}
+		return cachedQuestIcon;
 	}
 
 }

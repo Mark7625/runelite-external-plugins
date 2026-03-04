@@ -367,27 +367,27 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "showQuestRequirementsMet",
-			name = "Quest requirements met",
-			description = "Show when this level meets one of the requirements for a quest.",
+			keyName = "questRequirementMode",
+			name = "Quest unlocks",
+			description = "Only when all met: show when you have all quest requirements. When some met: show when this level meets at least one requirement for a quest.",
 			section = levelUpOrbsSection,
 			position = 32
 	)
-	default boolean showQuestRequirementsMet()
+	default RequirementDisplayMode questRequirementMode()
 	{
-		return true;
+		return RequirementDisplayMode.PARTIAL_MET;
 	}
 
 	@ConfigItem(
-			keyName = "showAllQuestRequirementsMet",
-			name = "All quest requirements met",
-			description = "Show when you now have all the levels required for a quest.",
+			keyName = "skillUnlockRequirementMode",
+			name = "Skill unlocks",
+			description = "Only when all met: show an unlock when you meet every level requirement. When some met: show when you meet at least one requirement.",
 			section = levelUpOrbsSection,
 			position = 33
 	)
-	default boolean showAllQuestRequirementsMet()
+	default RequirementDisplayMode skillUnlockRequirementMode()
 	{
-		return true;
+		return RequirementDisplayMode.ALL_MET;
 	}
 
 	@ConfigItem(
@@ -398,6 +398,18 @@ public interface RemasteredXpGlobesConfig extends Config {
 			position = 34
 	)
 	default boolean showSkillLevelUps()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "showMilestoneIcons",
+			name = "Show milestone icons",
+			description = "Show Milestone icons.",
+			section = levelUpOrbsSection,
+			position = 35
+	)
+	default boolean showMilestoneIcons()
 	{
 		return true;
 	}

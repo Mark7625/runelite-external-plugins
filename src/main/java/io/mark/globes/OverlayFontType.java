@@ -9,7 +9,7 @@ public enum OverlayFontType {
 	RUNESCAPE_SMALL("RuneScape Small", FontManager.getRunescapeSmallFont()),
 	RUNESCAPE_BOLD("RuneScape Bold", FontManager.getRunescapeBoldFont()),
 	DEFAULT("Default", FontManager.getDefaultFont()),
-	DEFAULT_BOLD("Default Bold", FontManager.getDefaultBoldFont());
+	VERDANA_BOLD("Verdana", new Font("Verdana", Font.BOLD, 11));
 
 	private final String displayName;
 	private final Font font;

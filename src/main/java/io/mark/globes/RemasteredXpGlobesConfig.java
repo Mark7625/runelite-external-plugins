@@ -113,7 +113,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "overlayFont",
+			keyName = "overlayFont1",
 			name = "Overlay font",
 			description = "Font used for XP popups, level up text, and orb percent on hover.",
 			section = globalSection,
@@ -121,7 +121,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	)
 	default OverlayFontType overlayFont()
 	{
-		return OverlayFontType.RUNESCAPE;
+		return OverlayFontType.VERDANA_BOLD;
 	}
 
 	@ConfigItem(
@@ -163,15 +163,15 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "xpDropShowIcons",
-			name = "Show skill icons",
-			description = "Show skill icons next to the XP amount.",
+			keyName = "xpDropFont",
+			name = "Font",
+			description = "Font for XP drop text.",
 			section = xpDropsSection,
 			position = 2
 	)
-	default boolean xpDropShowIcons()
+	default OverlayFontType xpDropFont()
 	{
-		return false;
+		return OverlayFontType.VERDANA_BOLD;
 	}
 
 	@ConfigItem(
@@ -183,7 +183,19 @@ public interface RemasteredXpGlobesConfig extends Config {
 	)
 	default Color xpDropFontColor()
 	{
-		return Color.decode("#E4A63E");
+		return Color.decode("#c49c57");
+	}
+
+	@ConfigItem(
+			keyName = "xpDropShowIcons",
+			name = "Show skill icons",
+			description = "Show skill icons next to the XP amount.",
+			section = xpDropsSection,
+			position = 4
+	)
+	default boolean xpDropShowIcons()
+	{
+		return false;
 	}
 
 	@ConfigItem(
@@ -191,7 +203,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Scale",
 			description = "Scale of the XP popup.",
 			section = xpDropsSection,
-			position = 4
+			position = 5
 	)
 	@Range(min = 50, max = 150)
 	@Units(Units.PERCENT)
@@ -205,7 +217,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Offset below orb",
 			description = "Pixels below the middle orb where the XP drop appears.",
 			section = xpDropsSection,
-			position = 5
+			position = 6
 	)
 	@Range(min = 0, max = 200)
 	@Units(Units.PIXELS)
@@ -219,7 +231,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Show background box",
 			description = "Draws a dark box behind the XP drop text for better visibility.",
 			section = xpDropsSection,
-			position = 6
+			position = 7
 	)
 	default boolean xpDropShowBackground()
 	{

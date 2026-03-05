@@ -358,7 +358,7 @@ public class XpGlobesOverlay extends Overlay {
 		String xpText = "+" + QuantityFormatter.formatNumber(drop.totalXp) + " xp";
 		boolean showIcons = config.xpDropShowIcons();
 
-		Font baseFont = config.overlayFont().getFont();
+		Font baseFont = config.xpDropFont().getFont();
 		float fontSize = Math.max(10f, baseFont.getSize2D() * scale);
 		Font scaledFont = baseFont.deriveFont(fontSize);
 		Font oldFont = graphics.getFont();

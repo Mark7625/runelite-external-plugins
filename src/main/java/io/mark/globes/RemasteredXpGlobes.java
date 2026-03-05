@@ -1,27 +1,25 @@
 package io.mark.globes;
 
+import com.google.inject.Provides;
 import io.mark.globes.model.LevelUpGlobe;
+import io.mark.globes.model.XpGlobe;
 import io.mark.globes.model.quest.QuestData;
 import io.mark.globes.model.quest.QuestUnlockResult;
-import io.mark.globes.model.XpGlobe;
 import io.mark.globes.model.skill.SkillData;
 import io.mark.globes.overlay.LevelUpGlobesOverlay;
 import io.mark.globes.overlay.XpGlobesOverlay;
-import com.google.inject.Provides;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.PostClientTick;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -42,14 +40,15 @@ import java.util.*;
 )
 @PluginDependency(XpTrackerPlugin.class)
 public class RemasteredXpGlobes extends Plugin {
-	private static final String CMD_TEST_ORB = "orb";
-	private static final String CMD_TEST_LEVEL = "olevel";
-	private static final String CMD_TEST_ALL_ORBS = "orball";
+
+	private static final long XP_SYNC_PENDING_MS = 1500;
+	private static final int STATS_TAB_CHILD_COUNT = 25;
 
 	private XpGlobe[] globeCache = new XpGlobe[Skill.values().length];
 	private final int[] previousLevels = new int[Skill.values().length];
-	private boolean levelsInitialized;
-	private Instant levelsInitializedTime;
+	private final boolean[] skillInitialized = new boolean[Skill.values().length];
+	private int initializedSkillCount = 0;
+	private boolean levelsInitialized = false;
 	private long xpDropSyncPendingTime = 0;
 
 	@Getter
@@ -75,9 +74,6 @@ public class RemasteredXpGlobes extends Plugin {
 
 	@Inject
 	private LevelUpGlobesOverlay levelUpOverlay;
-
-	@Inject
-	private SpriteManager spriteManager;
 
 	@Inject
 	private QuestData questData;
@@ -119,7 +115,6 @@ public class RemasteredXpGlobes extends Plugin {
 	public void onConfigChanged(ConfigChanged configChanged) {
 		if (Objects.equals(configChanged.getKey(), "skillIconMode")) {
 			setIconMode(false);
-			System.out.println("hjereee");
 		}
 	}
 
@@ -134,12 +129,17 @@ public class RemasteredXpGlobes extends Plugin {
 		overlay.onStatChanged(skill, currentXp);
 
 		if (!levelsInitialized) {
-			return;
-		}
+			if (!skillInitialized[skillIdx]) {
+				skillInitialized[skillIdx] = true;
+				initializedSkillCount++;
+			}
 
-		if (levelsInitializedTime != null
-				&& now.minusSeconds(2).isBefore(levelsInitializedTime)) {
 			previousLevels[skillIdx] = currentLevel;
+
+			if (initializedSkillCount == Skill.values().length) {
+				levelsInitialized = true;
+			}
+
 			return;
 		}
 
@@ -196,7 +196,7 @@ public class RemasteredXpGlobes extends Plugin {
 		if (cachedGlobe == null) {
 			globeCache[skillIdx] = new XpGlobe(skill, currentXp, displayLevel, now);
 			previousLevels[skillIdx] = currentLevel;
-			return;
+			cachedGlobe = globeCache[skillIdx];
 		}
 
 		cachedGlobe.setSkill(skill);
@@ -235,7 +235,7 @@ public class RemasteredXpGlobes extends Plugin {
 
 	@Schedule(period = 1, unit = ChronoUnit.SECONDS)
 	public void removeExpiredXpGlobes() {
-		if (xpDropSyncPendingTime > 0 && System.currentTimeMillis() - xpDropSyncPendingTime >= 1500) {
+		if (xpDropSyncPendingTime > 0 && System.currentTimeMillis() - xpDropSyncPendingTime >= XP_SYNC_PENDING_MS) {
 			overlay.syncPreviousXpFromClient();
 			xpDropSyncPendingTime = 0;
 		}
@@ -268,17 +268,10 @@ public class RemasteredXpGlobes extends Plugin {
 		globeCache = new XpGlobe[Skill.values().length];
 		levelUpQueue.clear();
 		currentLevelUp = null;
+		Arrays.fill(skillInitialized, false);
+		Arrays.fill(previousLevels, 0);
+		initializedSkillCount = 0;
 		levelsInitialized = false;
-		levelsInitializedTime = null;
-	}
-
-	private void initializePreviousLevels() {
-		for (Skill skill : Skill.values()) {
-			int skillIdx = skill.ordinal();
-			previousLevels[skillIdx] = client.getRealSkillLevel(skill);
-		}
-		levelsInitialized = true;
-		levelsInitializedTime = Instant.now();
 	}
 
 	@Subscribe
@@ -291,7 +284,6 @@ public class RemasteredXpGlobes extends Plugin {
 				xpDropSyncPendingTime = 0;
 				break;
 			case LOGGED_IN:
-				initializePreviousLevels();
 				overlay.initPreviousXp();
 				xpDropSyncPendingTime = System.currentTimeMillis();
 				break;
@@ -299,83 +291,89 @@ public class RemasteredXpGlobes extends Plugin {
 	}
 
 	@Subscribe
-	public void onCommandExecuted(CommandExecuted commandExecuted) {
-		String[] args = commandExecuted.getArguments();
+	public void onCommandExecuted(CommandExecuted event) {
+		if (!developerMode) return;
 
-		String command = commandExecuted.getCommand();
-		if (CMD_TEST_ORB.equals(command) && developerMode) {
-			Skill randomSkill;
-			if (args.length == 1) {
-				String skillName = args[0].toUpperCase();
-				randomSkill = Skill.valueOf(skillName.toUpperCase());
-			} else  {
-				Skill[] skills = Skill.values();
-				randomSkill = skills[(int) (Math.random() * skills.length)];
-			}
-			int skillIdx = randomSkill.ordinal();
-			int currentXp = client.getSkillExperience(randomSkill);
-			int currentLevel = client.getRealSkillLevel(randomSkill);
+		String command = event.getCommand();
+		String[] args = event.getArguments();
 
-			XpGlobe testGlobe = new XpGlobe(randomSkill, currentXp, currentLevel, Instant.now());
-			globeCache[skillIdx] = testGlobe;
-			addXpGlobe(testGlobe);
-		} else if (CMD_TEST_LEVEL.equals(command) && developerMode) {
-			if (args == null || args.length < 2) {
-				return;
-			}
+		try {
+			if ("orb".equals(command)) {
+				Skill skill;
+				if (args != null && args.length == 1) {
+					skill = Skill.valueOf(args[0].toUpperCase());
+				} else {
+					Skill[] skills = Skill.values();
+					skill = skills[(int) (Math.random() * skills.length)];
+				}
+				int idx = skill.ordinal();
+				int xp = client.getSkillExperience(skill);
+				int level = client.getRealSkillLevel(skill);
 
-			try {
-				String skillName = args[0].toUpperCase();
-				int level = Integer.parseInt(args[1]);
-				Skill skill = Skill.valueOf(skillName);
+				XpGlobe globe = new XpGlobe(skill, xp, level, Instant.now());
+				globeCache[idx] = globe;
+				addXpGlobe(globe);
 
-				Map<Skill, Integer> playerLevels = new HashMap<>();
+			} else if ("orball".equals(command)) {
+				for (Skill skill : Skill.values()) {
+					int idx = skill.ordinal();
+					int xp = client.getSkillExperience(skill);
+					int level = client.getRealSkillLevel(skill);
+
+					XpGlobe globe = new XpGlobe(skill, xp, level, Instant.now());
+					globeCache[idx] = globe;
+					addXpGlobe(globe);
+				}
+
+			} else if ("olevel".equals(command)) {
+				if (args == null || args.length < 2) return;
+
+				Skill skill = Skill.valueOf(args[0].toUpperCase());
+				int newLevel = Integer.parseInt(args[1]);
+
+				Map<Skill, Integer> playerLevels = new EnumMap<>(Skill.class);
 				for (Skill s : Skill.values()) {
 					playerLevels.put(s, client.getRealSkillLevel(s));
 				}
 				int previousLevel = playerLevels.getOrDefault(skill, 0);
-				playerLevels.put(skill, level);
+				playerLevels.put(skill, newLevel);
 
-				QuestUnlockResult questUnlockResult = questData.checkQuestUnlocks(skill, level, previousLevel, playerLevels);
+				QuestUnlockResult questUnlockResult =
+						questData.checkQuestUnlocks(skill, newLevel, previousLevel, playerLevels);
 
-				LevelUpGlobe levelUp = new LevelUpGlobe(skill, level, Instant.now(), questUnlockResult, skillData,
-						previousLevel, config.maxMilestones(),
-						config.questRequirementMode(), config.skillUnlockRequirementMode(), config.showSkillLevelUps(), playerLevels);
+				LevelUpGlobe levelUp = new LevelUpGlobe(skill, newLevel, Instant.now(), questUnlockResult,
+						skillData,
+						previousLevel,
+						config.maxMilestones(),
+						config.questRequirementMode(),
+						config.skillUnlockRequirementMode(),
+						config.showSkillLevelUps(),
+						playerLevels
+				);
+
 				levelUpQueue.add(levelUp);
 				processLevelUpQueue();
-			} catch (IllegalArgumentException ignored) {
 			}
-		} else if (CMD_TEST_ALL_ORBS.equals(command) && developerMode) {
-			for (Skill skill : Skill.values()) {
-				int skillIdx = skill.ordinal();
-				int currentXp = client.getSkillExperience(skill);
-				int currentLevel = client.getRealSkillLevel(skill);
-
-				XpGlobe testGlobe = new XpGlobe(skill, currentXp, currentLevel, Instant.now());
-				globeCache[skillIdx] = testGlobe;
-				addXpGlobe(testGlobe);
-			}
+		} catch (IllegalArgumentException ignored) {
+			// ignore invalid skill or number format
 		}
 	}
 
-	public void setIconMode(boolean forceOff)
-	{
+	public void setIconMode(boolean forceOff) {
 		boolean hideGlow = !forceOff && config.skillIconMode() == SkillIconMode.NO_GLOW;
 
-		for (int i = 1; i <= 25; i++)
-		{
+		for (int i = 1; i <= STATS_TAB_CHILD_COUNT; i++) {
 			Widget parent = client.getWidget(InterfaceID.STATS, i);
-			if (parent == null)
-			{
+
+			if (parent == null) {
 				continue;
 			}
 
 			Widget glowIcon = parent.getChild(2);
-			if (glowIcon != null)
-			{
+
+			if (glowIcon != null) {
 				glowIcon.setHidden(hideGlow);
 			}
 		}
 	}
-
 }

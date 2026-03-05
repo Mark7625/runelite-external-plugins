@@ -35,10 +35,11 @@ import java.util.Map;
 
 public class XpGlobesOverlay extends Overlay {
 
-	private static final double MIN_ANIMATION_SPEED = 0.02;
-	private static final double MAX_ANIMATION_SPEED = 0.15;
 	private static final double ANIMATION_THRESHOLD = 0.001;
-	private static final double ANIMATION_FRAME_TIME = 16.0;
+	/** Cap delta so arc never jumps in one frame (e.g. after tab switch). */
+	private static final long MAX_ANIMATION_DELTA_MS = 40;
+	/** Lerp factor per capped step (ease-out: move this fraction of remaining distance). Higher = faster. */
+	private static final double ARC_LERP_PER_STEP = 0.38;
 
 	private static final int DEFAULT_ORB_WIDTH = 219;
 	private static final int DEFAULT_ORB_HEIGHT = 210;
@@ -441,44 +442,51 @@ public class XpGlobesOverlay extends Overlay {
 
 	private double getXpProgress(XpGlobe xpGlobe) {
 		int currentLevel = xpGlobe.getCurrentLevel();
-		int currentXp = xpGlobe.getCurrentXp();
-		int xpForCurrentLevel = Experience.getXpForLevel(currentLevel);
+		long currentXp = xpGlobe.getCurrentXp() & 0xFFFFFFFFL;
+		long xpForCurrentLevel = Experience.getXpForLevel(currentLevel);
 
-		int goalXp = xpTrackerService.getEndGoalXp(xpGlobe.getSkill());
+		int goalXpInt = xpTrackerService.getEndGoalXp(xpGlobe.getSkill());
+		long goalXp = goalXpInt & 0xFFFFFFFFL;
 		if (isGoalSet(xpGlobe.getSkill()) && goalXp > currentXp) {
 			Integer goalStartVarp = Constants.SKILL_GOAL_START_VARP.get(xpGlobe.getSkill());
-			long goalStartXp = goalStartVarp != null ? client.getVarpValue(goalStartVarp) : xpForCurrentLevel;
-			if (goalStartXp <= 0) {
+			long goalStartXp = goalStartVarp != null ? (client.getVarpValue(goalStartVarp) & 0xFFFFFFFFL) : xpForCurrentLevel;
+			if (goalStartXp <= 0 || goalStartXp < xpForCurrentLevel) {
 				goalStartXp = xpForCurrentLevel;
 			}
 			long range = goalXp - goalStartXp;
 			if (range <= 0) {
 				return 1.0;
 			}
-			return Math.min(1.0, Math.max(0.0, (double) (currentXp - goalStartXp) / range));
+			long gained = currentXp - goalStartXp;
+			if (gained <= 0) {
+				return 0.0;
+			}
+			// Use double division with long values for precise arc progress (avoids showing "nearly full" when 200k+ left)
+			double progress = (double) gained / (double) range;
+			return Math.min(1.0, Math.max(0.0, progress));
 		}
 
 		if (currentLevel >= Experience.MAX_REAL_LEVEL) {
 			return 0.0;
 		}
 
-		int xpForNextLevel = Experience.getXpForLevel(currentLevel + 1);
+		long xpForNextLevel = Experience.getXpForLevel(currentLevel + 1);
 		if (xpForNextLevel <= xpForCurrentLevel) {
 			return 0.0;
 		}
 
-		int xpGained = currentXp - xpForCurrentLevel;
-		int xpNeeded = xpForNextLevel - xpForCurrentLevel;
-		return Math.min(1.0, Math.max(0.0, (double) xpGained / xpNeeded));
+		long xpGained = currentXp - xpForCurrentLevel;
+		long xpNeeded = xpForNextLevel - xpForCurrentLevel;
+		return Math.min(1.0, Math.max(0.0, (double) xpGained / (double) xpNeeded));
 	}
 
 	private double updateAnimatedProgress(XpGlobe xpGlobe, double targetProgress) {
 		long currentTime = System.currentTimeMillis();
 		long deltaTime = currentTime - xpGlobe.getLastUpdateTime();
-
 		if (deltaTime <= 0) {
 			return xpGlobe.getAnimatedProgress();
 		}
+		deltaTime = Math.min(deltaTime, MAX_ANIMATION_DELTA_MS);
 
 		double currentProgress = xpGlobe.getAnimatedProgress();
 		double difference = targetProgress - currentProgress;
@@ -488,10 +496,10 @@ public class XpGlobesOverlay extends Overlay {
 			return targetProgress;
 		}
 
-		double absDifference = Math.abs(difference);
-		double speedFactor = MIN_ANIMATION_SPEED + (absDifference * (MAX_ANIMATION_SPEED - MIN_ANIMATION_SPEED));
-		double change = difference * speedFactor * (deltaTime / ANIMATION_FRAME_TIME);
-		double newProgress = currentProgress + change;
+		// Lerp: move a fixed fraction of the remaining distance (ease-out, smooth and fast)
+		double t = (double) deltaTime / MAX_ANIMATION_DELTA_MS;
+		double stepFactor = 1.0 - Math.pow(1.0 - ARC_LERP_PER_STEP, t);
+		double newProgress = currentProgress + difference * stepFactor;
 
 		if ((difference > 0 && newProgress > targetProgress) || (difference < 0 && newProgress < targetProgress)) {
 			newProgress = targetProgress;

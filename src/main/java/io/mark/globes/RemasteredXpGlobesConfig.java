@@ -113,7 +113,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "overlayFont1",
+			keyName = "overlayFont",
 			name = "Overlay font",
 			description = "Font used for XP popups, level up text, and orb percent on hover.",
 			section = globalSection,
@@ -121,7 +121,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	)
 	default OverlayFontType overlayFont()
 	{
-		return OverlayFontType.VERDANA_BOLD;
+		return OverlayFontType.RUNESCAPE;
 	}
 
 	@ConfigItem(
@@ -163,7 +163,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "xpDropFont",
+			keyName = "xpDropFont1",
 			name = "Font",
 			description = "Font for XP drop text.",
 			section = xpDropsSection,

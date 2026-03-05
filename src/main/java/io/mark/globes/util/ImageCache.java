@@ -8,8 +8,10 @@ import java.io.File;
 import java.util.function.Supplier;
 
 public class ImageCache {
+	private static final String MODERN_PREFIX = "globes_modern/";
+
 	private final Class<?> resourceClass;
-	private final String resourcePath;
+	private final Supplier<String> resourcePathSupplier;
 	private final int baseWidth;
 	private final int baseHeight;
 	private final Supplier<String> customBasePath;
@@ -22,12 +24,16 @@ public class ImageCache {
 	private int cachedScale = -1;
 
 	public ImageCache(Class<?> resourceClass, String resourcePath, int baseWidth, int baseHeight) {
-		this(resourceClass, resourcePath, baseWidth, baseHeight, null);
+		this(resourceClass, () -> resourcePath, baseWidth, baseHeight, null);
 	}
 
 	public ImageCache(Class<?> resourceClass, String resourcePath, int baseWidth, int baseHeight, Supplier<String> customBasePath) {
+		this(resourceClass, () -> resourcePath, baseWidth, baseHeight, customBasePath);
+	}
+
+	public ImageCache(Class<?> resourceClass, Supplier<String> resourcePathSupplier, int baseWidth, int baseHeight, Supplier<String> customBasePath) {
 		this.resourceClass = resourceClass;
-		this.resourcePath = resourcePath;
+		this.resourcePathSupplier = resourcePathSupplier;
 		this.baseWidth = baseWidth;
 		this.baseHeight = baseHeight;
 		this.customBasePath = customBasePath != null ? customBasePath : () -> "";
@@ -38,8 +44,12 @@ public class ImageCache {
 	}
 
 	public ImageCache(Class<?> resourceClass, String resourcePathPrefix, int count, int baseWidth, int baseHeight, Supplier<String> customBasePath) {
+		this(resourceClass, () -> resourcePathPrefix, count, baseWidth, baseHeight, customBasePath);
+	}
+
+	public ImageCache(Class<?> resourceClass, Supplier<String> resourcePathPrefixSupplier, int count, int baseWidth, int baseHeight, Supplier<String> customBasePath) {
 		this.resourceClass = resourceClass;
-		this.resourcePath = resourcePathPrefix;
+		this.resourcePathSupplier = resourcePathPrefixSupplier;
 		this.baseWidth = baseWidth;
 		this.baseHeight = baseHeight;
 		this.customBasePath = customBasePath != null ? customBasePath : () -> "";
@@ -47,10 +57,6 @@ public class ImageCache {
 		this.cachedScaledImages = new BufferedImage[count];
 	}
 
-	/**
-	 * Load image from file only if dimensions match expected size.
-	 * Returns null on any error so callers can fall back to internal sprites.
-	 */
 	public static BufferedImage loadImageFromFile(File file, int expectedWidth, int expectedHeight) {
 		if (file == null || !file.isFile()) {
 			return null;
@@ -61,15 +67,24 @@ public class ImageCache {
 				return img;
 			}
 		} catch (Throwable ignored) {
-			// any error: invalid path, IO, security, etc. -> fall back to internal
 		}
 		return null;
+	}
+
+	private BufferedImage safeLoadResource(String path) {
+		try {
+			return ImageUtil.loadImageResource(resourceClass, path);
+		} catch (Throwable ignored) {
+			return null;
+		}
 	}
 
 	private void loadBaseImage() {
 		if (baseImage != null) {
 			return;
 		}
+		String resourcePath = resourcePathSupplier.get();
+		if (resourcePath == null) resourcePath = "";
 		try {
 			String path = customBasePath.get();
 			if (path != null && !path.trim().isEmpty()) {
@@ -81,17 +96,21 @@ public class ImageCache {
 				}
 			}
 		} catch (Throwable ignored) {
-			// any error -> fall back to internal
 		}
-		baseImage = ImageUtil.loadImageResource(resourceClass, resourcePath);
+		baseImage = safeLoadResource(resourcePath);
+		if (baseImage == null && resourcePath.startsWith(MODERN_PREFIX)) {
+			baseImage = safeLoadResource(resourcePath.substring(MODERN_PREFIX.length()));
+		}
 	}
 
 	private void loadBaseImages(int count) {
+		String prefix = resourcePathSupplier.get();
+		if (prefix == null) prefix = "";
 		for (int i = 0; i < count; i++) {
 			if (baseImages[i] != null) {
 				continue;
 			}
-			String relativePath = resourcePath + i + ".png";
+			String relativePath = prefix + i + ".png";
 			try {
 				String path = customBasePath.get();
 				if (path != null && !path.trim().isEmpty()) {
@@ -103,9 +122,11 @@ public class ImageCache {
 					}
 				}
 			} catch (Throwable ignored) {
-				// any error -> fall back to internal for this image
 			}
-			baseImages[i] = ImageUtil.loadImageResource(resourceClass, relativePath);
+			baseImages[i] = safeLoadResource(relativePath);
+			if (baseImages[i] == null && prefix.startsWith(MODERN_PREFIX)) {
+				baseImages[i] = safeLoadResource(prefix.substring(MODERN_PREFIX.length()) + i + ".png");
+			}
 		}
 	}
 
@@ -114,8 +135,11 @@ public class ImageCache {
 			try {
 				loadBaseImage();
 			} catch (Throwable ignored) {
-				// fall back to internal only
-				baseImage = ImageUtil.loadImageResource(resourceClass, resourcePath);
+				String p = resourcePathSupplier.get();
+				baseImage = safeLoadResource(p != null ? p : "");
+				if (baseImage == null && p != null && p.startsWith(MODERN_PREFIX)) {
+					baseImage = safeLoadResource(p.substring(MODERN_PREFIX.length()));
+				}
 			}
 		}
 		if (baseImage == null) {
@@ -144,10 +168,14 @@ public class ImageCache {
 			try {
 				loadBaseImages(baseImages.length);
 			} catch (Throwable ignored) {
-				// fall back to internal for any failed slot
+				String prefix = resourcePathSupplier.get();
+				if (prefix == null) prefix = "";
 				for (int i = 0; i < baseImages.length; i++) {
 					if (baseImages[i] == null) {
-						baseImages[i] = ImageUtil.loadImageResource(resourceClass, resourcePath + i + ".png");
+						baseImages[i] = safeLoadResource(prefix + i + ".png");
+						if (baseImages[i] == null && prefix.startsWith(MODERN_PREFIX)) {
+							baseImages[i] = safeLoadResource(prefix.substring(MODERN_PREFIX.length()) + i + ".png");
+						}
 					}
 				}
 			}

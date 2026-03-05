@@ -1,5 +1,6 @@
 package io.mark.globes.overlay;
 
+import io.mark.globes.GlobeStyle;
 import io.mark.globes.RemasteredXpGlobes;
 import io.mark.globes.RemasteredXpGlobesConfig;
 import io.mark.globes.model.LevelUpGlobe;
@@ -22,6 +23,7 @@ import net.runelite.client.util.ImageUtil;
 import javax.inject.Inject;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.RescaleOp;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -58,9 +60,12 @@ public class LevelUpGlobesOverlay extends Overlay {
 	private final ItemManager itemManager;
 
 	private static final int MILESTONE_ICON_SIZE = 18;
-	private static final int MILESTONE_QUEST_ICON_SIZE = 14;
+	private static final int MILESTONE_QUEST_ICON_SIZE = 15;
 	private static final int MILESTONE_ICON_TEXT_GAP = 8;
 	private static final int MILESTONE_ICON_CONTENT_PADDING = 28;
+	private static final float MILESTONE_DARK_LUMINANCE_THRESHOLD = 0.36f;
+	private static final float MILESTONE_BRIGHTEN_SCALE = 1.2f;
+	private static final float MILESTONE_BRIGHTEN_OFFSET = 32f;
 
 	private BufferedImage cachedQuestIcon;
 
@@ -72,9 +77,18 @@ public class LevelUpGlobesOverlay extends Overlay {
 		this.spriteManager = spriteManager;
 		this.itemManager = itemManager;
 		setPosition(OverlayPosition.TOP_CENTER);
-		this.silverLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_silver/level_up_", FRAME_COUNT, 144, 98, () -> config.customSpritesPath());
-		this.goldLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_gold/level_up_", FRAME_COUNT, 144, 98, () -> config.customSpritesPath());
-		this.numberImageCache = new ImageCache(RemasteredXpGlobes.class, "numbers/", 10, 33, 48, () -> config.customSpritesPath());
+		this.silverLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class,
+				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "level_up_silver/level_up_",
+				FRAME_COUNT, 144, 98,
+				() -> config.globeStyle() == GlobeStyle.CUSTOM ? config.customSpritesPath() : "");
+		this.goldLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class,
+				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "level_up_gold/level_up_",
+				FRAME_COUNT, 144, 98,
+				() -> config.globeStyle() == GlobeStyle.CUSTOM ? config.customSpritesPath() : "");
+		this.numberImageCache = new ImageCache(RemasteredXpGlobes.class,
+				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "numbers/",
+				10, 33, 48,
+				() -> config.globeStyle() == GlobeStyle.CUSTOM ? config.customSpritesPath() : "");
 		loadMilestoneImages();
 	}
 
@@ -99,13 +113,37 @@ public class LevelUpGlobesOverlay extends Overlay {
 		lastLevelUpGlobe = null;
 	}
 
+	private static BufferedImage safeLoadMilestonePart(String path) {
+		try {
+			return ImageUtil.loadImageResource(RemasteredXpGlobes.class, path);
+		} catch (Throwable ignored) {
+			return null;
+		}
+	}
+
 	private void loadMilestoneImages() {
 		if (baseMilestoneLeft != null) {
 			return;
 		}
-		BufferedImage internalLeft = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/left.png");
-		BufferedImage internalMiddle = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/middle.png");
-		BufferedImage internalRight = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/right.png");
+		String classicLeft = "level_up_silver/left.png";
+		String classicMiddle = "level_up_silver/middle.png";
+		String classicRight = "level_up_silver/right.png";
+		BufferedImage internalLeft;
+		BufferedImage internalMiddle;
+		BufferedImage internalRight;
+		if (config.globeStyle() == GlobeStyle.MODERN) {
+			String modernBase = "/io/mark/globes_modern/level_up_silver/";
+			internalLeft = safeLoadMilestonePart(modernBase + "left.png");
+			if (internalLeft == null) internalLeft = safeLoadMilestonePart(classicLeft);
+			internalMiddle = safeLoadMilestonePart(modernBase + "middle.png");
+			if (internalMiddle == null) internalMiddle = safeLoadMilestonePart(classicMiddle);
+			internalRight = safeLoadMilestonePart(modernBase + "right.png");
+			if (internalRight == null) internalRight = safeLoadMilestonePart(classicRight);
+		} else {
+			internalLeft = safeLoadMilestonePart(classicLeft);
+			internalMiddle = safeLoadMilestonePart(classicMiddle);
+			internalRight = safeLoadMilestonePart(classicRight);
+		}
 		if (internalLeft == null || internalMiddle == null || internalRight == null) {
 			baseMilestoneLeft = internalLeft;
 			baseMilestoneMiddle = internalMiddle;
@@ -115,11 +153,13 @@ public class LevelUpGlobesOverlay extends Overlay {
 		baseMilestoneLeft = internalLeft;
 		baseMilestoneMiddle = internalMiddle;
 		baseMilestoneRight = internalRight;
+		if (config.globeStyle() != GlobeStyle.CUSTOM) {
+			return;
+		}
 		try {
 			String customPath = config.customSpritesPath();
 			if (customPath != null && !customPath.trim().isEmpty()) {
-				String base = customPath.trim();
-				File dir = new File(base);
+				File dir = new File(customPath.trim());
 				int wLeft = internalLeft.getWidth(), hLeft = internalLeft.getHeight();
 				int wMid = internalMiddle.getWidth(), hMid = internalMiddle.getHeight();
 				int wRight = internalRight.getWidth(), hRight = internalRight.getHeight();
@@ -131,7 +171,6 @@ public class LevelUpGlobesOverlay extends Overlay {
 				if (customRight != null) baseMilestoneRight = customRight;
 			}
 		} catch (Throwable ignored) {
-			// any error -> keep internal sprites already set above
 		}
 	}
 
@@ -252,28 +291,49 @@ public class LevelUpGlobesOverlay extends Overlay {
 	private void drawMilestoneMessage(Graphics2D graphics, LevelUpGlobe levelUp, int orbX, int orbY, int orbWidth, int orbHeight, int scalePercent) {
 		if (levelUp.getMilestones() == null || levelUp.getMilestones().isEmpty()) return;
 		int max = Math.min(config.maxMilestones(), levelUp.getMilestones().size());
-		if (currentMilestoneIndex >= max || scaledMilestoneLeft == null) return;
+		if (currentMilestoneIndex >= max || scaledMilestoneLeft == null || scaledMilestoneMiddle == null || scaledMilestoneRight == null) return;
+
 		MilestoneDisplay milestone = levelUp.getMilestones().get(currentMilestoneIndex);
 		String message = milestone.getMessage();
 		if (message == null || message.isEmpty()) return;
 		message = stripAfterBr(message);
 		if (message.isEmpty()) return;
 
-		int iconItemId = milestone.getIconItemId();
-		boolean showIcon = config.showMilestoneIcons() && iconItemId != -1;
-		int iconSize = (iconItemId == MilestoneDisplay.QUEST_ICON_ID) ? MILESTONE_QUEST_ICON_SIZE : MILESTONE_ICON_SIZE;
+		boolean showIcon = config.showMilestoneIcons() && milestone.getIconItemId() != -1;
+		int iconSize = (milestone.getIconItemId() == MilestoneDisplay.QUEST_ICON_ID) ? MILESTONE_QUEST_ICON_SIZE : MILESTONE_ICON_SIZE;
 		BufferedImage iconImage = null;
 		if (showIcon) {
-			if (iconItemId == MilestoneDisplay.QUEST_ICON_ID) {
+			if (milestone.getIconItemId() == MilestoneDisplay.QUEST_ICON_ID) {
 				iconImage = getQuestIcon();
 			} else {
-				iconImage = itemManager.getImage(iconItemId);
+				iconImage = itemManager.getImage(milestone.getIconItemId());
 			}
 		}
+		float fontSize = (float) (config.overlayFont().getFont().getSize2D() * Math.max(0.5, scalePercent / 100.0));
+		Font font = config.overlayFont().getFont().deriveFont(fontSize);
+		FontMetrics fm = graphics.getFontMetrics(font);
+		int textWidth = fm.stringWidth(message);
+		int textHeight = fm.getHeight();
+		int horizontalPadding = showIcon ? MILESTONE_ICON_CONTENT_PADDING : 20;
+		int contentWidth = horizontalPadding + (showIcon ? (iconSize + MILESTONE_ICON_TEXT_GAP) : 0) + textWidth + horizontalPadding;
+
+		int leftW = scaledMilestoneLeft.getWidth();
+		int middleW = scaledMilestoneMiddle.getWidth();
+		int rightW = scaledMilestoneRight.getWidth();
+		int middleNeeded = contentWidth - leftW - rightW;
+		int middleCount = middleW > 0 ? Math.max(1, (int) Math.ceil((double) middleNeeded / middleW)) : 1;
+		int bgWidth = leftW + middleW * middleCount + rightW;
+		int bgHeight = scaledMilestoneLeft.getHeight();
+
+		double scaleFactor = scalePercent / 100.0;
+		int baseY = orbY + orbHeight + (int) (MILESTONE_OFFSET_Y * scaleFactor);
+		int milestoneX = orbX + (orbWidth - bgWidth) / 2;
+		int milestoneY = baseY;
+		int leftEndX = milestoneX + leftW;
+		int rightStartX = leftEndX + middleW * middleCount;
 
 		long milestoneElapsed = currentMilestoneStartTime == null ? 0 : Duration.between(currentMilestoneStartTime, Instant.now()).toMillis();
-		float alpha;
-		float slideOffset = 0;
+		float alpha = 1.0f;
 		if (milestoneElapsed < MILESTONE_FADE_IN_MILLIS) {
 			alpha = (float) milestoneElapsed / MILESTONE_FADE_IN_MILLIS;
 		} else if (milestoneElapsed >= MILESTONE_SLIDE_START_MILLIS) {
@@ -281,77 +341,79 @@ public class LevelUpGlobesOverlay extends Overlay {
 			long slideDuration = MILESTONE_DISPLAY_MILLIS - MILESTONE_SLIDE_START_MILLIS;
 			float progress = Math.min(1f, (float) intoSlide / slideDuration);
 			alpha = 1f - progress;
-			double s = scalePercent / 100.0;
-			int baseY = orbY + orbHeight + (int)(MILESTONE_OFFSET_Y * s);
-			int targetY = orbY + orbHeight / 2 - scaledMilestoneLeft.getHeight() / 2;
-			slideOffset = (float)(baseY - targetY) * progress;
-		} else {
-			alpha = 1.0f;
+			int targetY = orbY + orbHeight / 2 - bgHeight / 2;
+			milestoneY = (int) (baseY - (baseY - targetY) * progress);
 		}
 
-		float fontSize = (float) (config.overlayFont().getFont().getSize2D() * Math.max(0.5, scalePercent / 100.0));
-		Font font = config.overlayFont().getFont().deriveFont(fontSize);
-		Font oldFont = graphics.getFont();
-		graphics.setFont(font);
-
-		FontMetrics fm = graphics.getFontMetrics();
-		int textWidth = fm.stringWidth(message);
-		int textHeight = fm.getHeight();
-		int middleW = scaledMilestoneMiddle.getWidth();
-		int leftW = scaledMilestoneLeft.getWidth();
-		int rightW = scaledMilestoneRight.getWidth();
-		// With icon: use symmetric padding so icon+text block is centered; without: text + 40 as before
-		final int contentPadding = showIcon ? MILESTONE_ICON_CONTENT_PADDING : 20;
-		int contentWidth = showIcon
-				? iconSize + MILESTONE_ICON_TEXT_GAP + textWidth + contentPadding
-				: textWidth + 40;
-		int middleNeeded = Math.max(0, contentWidth - leftW - rightW);
-		int middleCount = Math.max(1, (int) Math.ceil((double) middleNeeded / middleW));
-		int bgWidth = leftW + middleW * middleCount + rightW;
-		int bgHeight = scaledMilestoneLeft.getHeight();
-
-		double s = scalePercent / 100.0;
-		int baseY = orbY + orbHeight + (int)(MILESTONE_OFFSET_Y * s);
-		int milestoneX = orbX + (orbWidth - bgWidth) / 2;
-		int milestoneY = (int)(baseY - slideOffset);
-
-		Composite old = graphics.getComposite();
+		Composite oldComposite = graphics.getComposite();
 		graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
 
-		int cx = milestoneX;
-		graphics.drawImage(scaledMilestoneLeft, cx, milestoneY, null);
-		cx += scaledMilestoneLeft.getWidth();
+		graphics.drawImage(scaledMilestoneLeft, milestoneX, milestoneY, null);
 		for (int i = 0; i < middleCount; i++) {
-			graphics.drawImage(scaledMilestoneMiddle, cx, milestoneY, null);
-			cx += middleW;
+			graphics.drawImage(scaledMilestoneMiddle, leftEndX + i * middleW, milestoneY, null);
 		}
-		graphics.drawImage(scaledMilestoneRight, cx, milestoneY, null);
+		graphics.drawImage(scaledMilestoneRight, rightStartX, milestoneY, null);
 
-		// Center the content block (icon + text, or text only) horizontally in the bar
-		int contentStartX = milestoneX + (bgWidth - contentWidth) / 2;
-		int textX;
-		int iconX;
-		if (showIcon) {
-			int leftPad = contentPadding / 2;
-			iconX = contentStartX + leftPad;
-			textX = iconX + iconSize + MILESTONE_ICON_TEXT_GAP;
-		} else {
-			iconX = contentStartX;
-			// No icon: center text in the bar (content is text + padding only)
-			textX = contentStartX + (contentWidth - textWidth) / 2;
-		}
-		// Center icon and text vertically in the bar
+		int barCenterX = milestoneX + bgWidth / 2;
+		int contentBlockWidth = (showIcon ? iconSize + MILESTONE_ICON_TEXT_GAP : 0) + textWidth;
+		int contentBlockLeftX = barCenterX - contentBlockWidth / 2;
+
+		int iconX = contentBlockLeftX;
+		int textX = showIcon ? contentBlockLeftX + iconSize + MILESTONE_ICON_TEXT_GAP : barCenterX - textWidth / 2;
 		int iconY = milestoneY + (bgHeight - iconSize) / 2;
 		int textY = milestoneY + (bgHeight - textHeight) / 2 + fm.getAscent();
 
+		Font oldFont = graphics.getFont();
+		graphics.setFont(font);
 		if (showIcon && iconImage != null) {
-			graphics.drawImage(iconImage, iconX, iconY, iconSize, iconSize, null);
+			BufferedImage toDraw = iconImage;
+			boolean isQuestIcon = milestone.getIconItemId() == MilestoneDisplay.QUEST_ICON_ID;
+			if (!isQuestIcon) {
+				BufferedImage scaled = new BufferedImage(iconSize, iconSize, BufferedImage.TYPE_INT_ARGB);
+				Graphics2D sg = scaled.createGraphics();
+				sg.drawImage(iconImage, 0, 0, iconSize, iconSize, null);
+				sg.dispose();
+				float avgLum = averageLuminance(scaled);
+				if (avgLum < MILESTONE_DARK_LUMINANCE_THRESHOLD) {
+					RescaleOp rescaleOp = new RescaleOp(MILESTONE_BRIGHTEN_SCALE, MILESTONE_BRIGHTEN_OFFSET, null);
+					toDraw = rescaleOp.filter(scaled, null);
+				} else {
+					toDraw = scaled;
+				}
+			}
+			if (toDraw.getWidth() == iconSize && toDraw.getHeight() == iconSize) {
+				graphics.drawImage(toDraw, iconX, iconY, null);
+			} else {
+				graphics.drawImage(toDraw, iconX, iconY, iconSize, iconSize, null);
+			}
 		}
 		graphics.setColor(Color.WHITE);
 		graphics.drawString(message, textX, textY);
-
 		graphics.setFont(oldFont);
-		graphics.setComposite(old);
+
+		graphics.setComposite(oldComposite);
+	}
+
+	private static float averageLuminance(BufferedImage img) {
+		int w = img.getWidth();
+		int h = img.getHeight();
+		if (w <= 0 || h <= 0) return 0f;
+		long sum = 0;
+		int count = 0;
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				int rgb = img.getRGB(x, y);
+				int a = (rgb >> 24) & 0xFF;
+				int r = (rgb >> 16) & 0xFF;
+				int g = (rgb >> 8) & 0xFF;
+				int b = rgb & 0xFF;
+				if (a > 0) {
+					sum += (int) (0.299 * r + 0.587 * g + 0.114 * b);
+					count++;
+				}
+			}
+		}
+		return count == 0 ? 0f : (sum / (float) count) / 255f;
 	}
 
 	private void drawInnerGlobe(Graphics2D graphics, LevelUpGlobe levelUp, int imageX, int imageY, int sizeX, int sizeY, float alpha, long elapsedMillis, int scalePercent) {

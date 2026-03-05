@@ -56,6 +56,18 @@ public interface RemasteredXpGlobesConfig extends Config {
 	String xpDropsSection = "xpDrops";
 
 	@ConfigItem(
+			keyName = "globeStyle",
+			name = "Style",
+			description = "Classic: globes dir. Modern: globes_modern dir. Custom: folder path below.",
+			section = globalSection,
+			position = 0
+	)
+	default GlobeStyle globeStyle()
+	{
+		return GlobeStyle.CLASSIC;
+	}
+
+	@ConfigItem(
 			keyName = "skillIconMode",
 			name = "Skill Icon Mode",
 			description = "Controls how skill icons behave.",
@@ -63,7 +75,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			position = 1
 	)
 	default SkillIconMode skillIconMode() {
-		return SkillIconMode.NO_GLOW;
+		return SkillIconMode.ALPHA_PULSE;
 	}
 
 	@ConfigItem(
@@ -140,7 +152,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	@ConfigItem(
 			keyName = "customSpritesPath",
 			name = "Custom sprites folder",
-			description = "Folder path with same layout as plugin resources",
+			description = "Used when Style is Custom. Same layout as plugin resources.",
 			section = globalSection,
 			position = 8
 	)

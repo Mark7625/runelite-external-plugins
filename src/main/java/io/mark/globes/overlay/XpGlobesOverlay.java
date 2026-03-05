@@ -1,5 +1,6 @@
 package io.mark.globes.overlay;
 
+import io.mark.globes.GlobeStyle;
 import io.mark.globes.RemasteredXpGlobes;
 import io.mark.globes.RemasteredXpGlobesConfig;
 import io.mark.globes.model.XpGlobe;
@@ -36,14 +37,12 @@ import java.util.Map;
 public class XpGlobesOverlay extends Overlay {
 
 	private static final double ANIMATION_THRESHOLD = 0.001;
-	/** Cap delta so arc never jumps in one frame (e.g. after tab switch). */
 	private static final long MAX_ANIMATION_DELTA_MS = 40;
-	/** Lerp factor per capped step (ease-out: move this fraction of remaining distance). Higher = faster. */
 	private static final double ARC_LERP_PER_STEP = 0.38;
 
 	private static final int DEFAULT_ORB_WIDTH = 219;
 	private static final int DEFAULT_ORB_HEIGHT = 210;
-	private static final int MAX_ICON_SIZE = 154; // scaled from 40 for 219x210
+	private static final int MAX_ICON_SIZE = 154;
 	private static final int PROGRESS_ARC_OFFSET = 0;
 	private static final double ARC_START_ANGLE = 270.0;
 	private static final double ARC_FULL_CIRCLE = 360.0;
@@ -89,8 +88,14 @@ public class XpGlobesOverlay extends Overlay {
 		this.spriteManager = spriteManager;
 		setPosition(OverlayPosition.TOP_CENTER);
 
-		this.globeImageCache = new ImageCache(RemasteredXpGlobes.class, "globe.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT, () -> config.customSpritesPath());
-		this.arcImageCache = new ImageCache(RemasteredXpGlobes.class, "arc.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT, () -> config.customSpritesPath());
+		this.globeImageCache = new ImageCache(RemasteredXpGlobes.class,
+				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "globe.png",
+				DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT,
+				() -> config.globeStyle() == GlobeStyle.CUSTOM ? config.customSpritesPath() : "");
+		this.arcImageCache = new ImageCache(RemasteredXpGlobes.class,
+				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "arc.png",
+				DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT,
+				() -> config.globeStyle() == GlobeStyle.CUSTOM ? config.customSpritesPath() : "");
 
 	}
 
@@ -113,12 +118,10 @@ public class XpGlobesOverlay extends Overlay {
 		previousXp.put(skill, currentXp);
 	}
 
-	/** Clears previous XP tracking so we don't treat initial stat sync on login as gains. */
 	public void initPreviousXp() {
 		previousXp.clear();
 	}
 
-	/** Populates previous XP from client after login so first real gain is tracked. Call once client has stat data. */
 	public void syncPreviousXpFromClient() {
 		for (Skill skill : Skill.values()) {
 			if (skill != Skill.OVERALL && Constants.SKILL_ICONS.containsKey(skill)) {
@@ -205,7 +208,6 @@ public class XpGlobesOverlay extends Overlay {
 		int n = xpGlobes.size();
 		int xpDropOffset = config.xpDropOffset();
 
-		// Compute all orb X positions first (so XP drops use actual middle orb position)
 		double[] orbPositions = new double[n];
 		for (int i = 0; i < n; i++) {
 			XpGlobe xpGlobe = xpGlobes.get(i);
@@ -251,7 +253,6 @@ public class XpGlobesOverlay extends Overlay {
 			graphics.drawImage(scaledGlobeImage, drawX, baseY, null);
 
 			double scaleFactor = config.orbScale() / 100.0;
-			// Scaled from 41, 8, 7 for 219x210 orb (was 57x56)
 			int circleSize = (int) (157 * scaleFactor);
 			int circleWidth = circleSize;
 			int circleHeight = circleSize;
@@ -461,7 +462,6 @@ public class XpGlobesOverlay extends Overlay {
 			if (gained <= 0) {
 				return 0.0;
 			}
-			// Use double division with long values for precise arc progress (avoids showing "nearly full" when 200k+ left)
 			double progress = (double) gained / (double) range;
 			return Math.min(1.0, Math.max(0.0, progress));
 		}
@@ -496,7 +496,6 @@ public class XpGlobesOverlay extends Overlay {
 			return targetProgress;
 		}
 
-		// Lerp: move a fixed fraction of the remaining distance (ease-out, smooth and fast)
 		double t = (double) deltaTime / MAX_ANIMATION_DELTA_MS;
 		double stepFactor = 1.0 - Math.pow(1.0 - ARC_LERP_PER_STEP, t);
 		double newProgress = currentProgress + difference * stepFactor;

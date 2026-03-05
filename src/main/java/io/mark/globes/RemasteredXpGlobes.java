@@ -116,7 +116,7 @@ public class RemasteredXpGlobes extends Plugin {
 		if (Objects.equals(configChanged.getKey(), "skillIconMode")) {
 			setIconMode(false);
 		}
-		if (Objects.equals(configChanged.getKey(), "customSpritesPath")) {
+		if (Objects.equals(configChanged.getKey(), "customSpritesPath") || Objects.equals(configChanged.getKey(), "globeStyle")) {
 			overlay.clearCache();
 			levelUpOverlay.clearCache();
 		}
@@ -364,7 +364,7 @@ public class RemasteredXpGlobes extends Plugin {
 	}
 
 	public void setIconMode(boolean forceOff) {
-		boolean hideGlow = !forceOff && config.skillIconMode() == SkillIconMode.NO_GLOW;
+		boolean hideGlow = !forceOff && config.skillIconMode() == SkillIconMode.ALPHA_PULSE;
 
 		for (int i = 1; i <= STATS_TAB_CHILD_COUNT; i++) {
 			Widget parent = client.getWidget(InterfaceID.STATS, i);

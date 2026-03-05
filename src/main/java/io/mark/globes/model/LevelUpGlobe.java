@@ -56,7 +56,7 @@ public class LevelUpGlobe {
 			} else {
 				for (Quest quest : questUnlockResult.getNewlyUnlockedQuests()) {
 					int lvl = quest.getSkillRequirements().getOrDefault(skill, newLevel);
-					questMilestones.add(new MilestoneEntry(lvl, "one of the requirements for " + quest.getName(), MilestoneDisplay.QUEST_ICON_ID));
+					questMilestones.add(new MilestoneEntry(lvl, "You meet one of the requirements for " + quest.getName(), MilestoneDisplay.QUEST_ICON_ID));
 				}
 			}
 		}
@@ -111,7 +111,6 @@ public class LevelUpGlobe {
 			} else if (sRemaining == 0 && qRemaining > 0) {
 				qTake += Math.min(remaining, qRemaining);
 			} else if (qRemaining > 0 && sRemaining > 0) {
-				// Prefer filling skills first when both have remaining
 				int addS = Math.min(remaining, sRemaining);
 				sTake += addS;
 				remaining -= addS;

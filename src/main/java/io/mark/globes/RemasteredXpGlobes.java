@@ -14,9 +14,13 @@ import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.PostClientTick;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
@@ -29,11 +33,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @PluginDescriptor(
 		name = "Remastered Xp Globes",
@@ -101,6 +101,7 @@ public class RemasteredXpGlobes extends Plugin {
 		levelsInitialized = false;
 		questData.load();
 		skillData.load();
+		setIconMode(false);
 	}
 
 	@Override
@@ -111,6 +112,15 @@ public class RemasteredXpGlobes extends Plugin {
 		levelUpOverlay.clearCache();
 		overlayManager.remove(overlay);
 		overlayManager.remove(levelUpOverlay);
+		setIconMode(true);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged configChanged) {
+		if (Objects.equals(configChanged.getKey(), "skillIconMode")) {
+			setIconMode(false);
+			System.out.println("hjereee");
+		}
 	}
 
 	@Subscribe
@@ -344,6 +354,26 @@ public class RemasteredXpGlobes extends Plugin {
 				XpGlobe testGlobe = new XpGlobe(skill, currentXp, currentLevel, Instant.now());
 				globeCache[skillIdx] = testGlobe;
 				addXpGlobe(testGlobe);
+			}
+		}
+	}
+
+	public void setIconMode(boolean forceOff)
+	{
+		boolean hideGlow = !forceOff && config.skillIconMode() == SkillIconMode.NO_GLOW;
+
+		for (int i = 1; i <= 25; i++)
+		{
+			Widget parent = client.getWidget(InterfaceID.STATS, i);
+			if (parent == null)
+			{
+				continue;
+			}
+
+			Widget glowIcon = parent.getChild(2);
+			if (glowIcon != null)
+			{
+				glowIcon.setHidden(hideGlow);
 			}
 		}
 	}

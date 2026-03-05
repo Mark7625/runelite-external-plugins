@@ -56,11 +56,22 @@ public interface RemasteredXpGlobesConfig extends Config {
 	String xpDropsSection = "xpDrops";
 
 	@ConfigItem(
+			keyName = "skillIconMode",
+			name = "Skill Icon Mode",
+			description = "Controls how skill icons behave.",
+			section = globalSection,
+			position = 1
+	)
+	default SkillIconMode skillIconMode() {
+		return SkillIconMode.NO_GLOW;
+	}
+
+	@ConfigItem(
 			keyName = "hideMaxed",
 			name = "Hide maxed skills",
 			description = "Stop globes from showing up for level 99 skills.",
 			section = globalSection,
-			position = 1
+			position = 2
 	)
 	default boolean hideMaxed() {
 		return false;
@@ -71,7 +82,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Show virtual level",
 			description = "Shows virtual level if over 99 in a skill and 'Hide maxed skills' is not checked.",
 			section = globalSection,
-			position = 2
+			position = 3
 	)
 	default boolean showVirtualLevel() {
 		return false;
@@ -82,7 +93,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Disable XP globes",
 			description = "Completely disables the XP globes overlay.",
 			section = globalSection,
-			position = 3
+			position = 4
 	)
 	default boolean disableXpGlobes()
 	{
@@ -94,7 +105,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Disable level up popups",
 			description = "Completely disables the level up popup overlay.",
 			section = globalSection,
-			position = 4
+			position = 5
 	)
 	default boolean disableLevelUpPopups()
 	{
@@ -106,7 +117,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Overlay font",
 			description = "Font used for XP popups, level up text, and orb percent on hover.",
 			section = globalSection,
-			position = 5
+			position = 6
 	)
 	default OverlayFontType overlayFont()
 	{
@@ -118,7 +129,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			name = "Vertical offset",
 			description = "Offset all globes down from the top of the screen.",
 			section = globalSection,
-			position = 5
+			position = 7
 	)
 	@Units(Units.PIXELS)
 	default int verticalOffset()

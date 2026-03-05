@@ -116,6 +116,10 @@ public class RemasteredXpGlobes extends Plugin {
 		if (Objects.equals(configChanged.getKey(), "skillIconMode")) {
 			setIconMode(false);
 		}
+		if (Objects.equals(configChanged.getKey(), "customSpritesPath")) {
+			overlay.clearCache();
+			levelUpOverlay.clearCache();
+		}
 	}
 
 	@Subscribe

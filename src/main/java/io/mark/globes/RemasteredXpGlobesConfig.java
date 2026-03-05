@@ -138,6 +138,18 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
+			keyName = "customSpritesPath",
+			name = "Custom sprites folder",
+			description = "Folder path with same layout as plugin resources",
+			section = globalSection,
+			position = 8
+	)
+	default String customSpritesPath()
+	{
+		return "";
+	}
+
+	@ConfigItem(
 			keyName = "enableXpDrops",
 			name = "Enable XP drop popups",
 			description = "Shows the floating XP popup below the middle orb when you gain experience.",

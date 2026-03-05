@@ -8,6 +8,8 @@ import io.mark.globes.model.MilestoneDisplay;
 import io.mark.globes.util.Constants;
 import io.mark.globes.util.ImageCache;
 import net.runelite.api.Client;
+
+import java.io.File;
 import net.runelite.api.Skill;
 import net.runelite.api.SpritePixels;
 import net.runelite.api.gameval.SpriteID;
@@ -70,9 +72,9 @@ public class LevelUpGlobesOverlay extends Overlay {
 		this.spriteManager = spriteManager;
 		this.itemManager = itemManager;
 		setPosition(OverlayPosition.TOP_CENTER);
-		this.silverLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_silver/level_up_", FRAME_COUNT, 144, 98);
-		this.goldLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_gold/level_up_", FRAME_COUNT, 144, 98);
-		this.numberImageCache = new ImageCache(RemasteredXpGlobes.class, "numbers/", 10, 33, 48);
+		this.silverLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_silver/level_up_", FRAME_COUNT, 144, 98, () -> config.customSpritesPath());
+		this.goldLevelUpImageCache = new ImageCache(RemasteredXpGlobes.class, "level_up_gold/level_up_", FRAME_COUNT, 144, 98, () -> config.customSpritesPath());
+		this.numberImageCache = new ImageCache(RemasteredXpGlobes.class, "numbers/", 10, 33, 48, () -> config.customSpritesPath());
 		loadMilestoneImages();
 	}
 
@@ -98,14 +100,45 @@ public class LevelUpGlobesOverlay extends Overlay {
 	}
 
 	private void loadMilestoneImages() {
-		if (baseMilestoneLeft == null) {
-			baseMilestoneLeft = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/left.png");
-			baseMilestoneMiddle = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/middle.png");
-			baseMilestoneRight = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/right.png");
+		if (baseMilestoneLeft != null) {
+			return;
+		}
+		BufferedImage internalLeft = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/left.png");
+		BufferedImage internalMiddle = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/middle.png");
+		BufferedImage internalRight = ImageUtil.loadImageResource(RemasteredXpGlobes.class, "level_up_silver/right.png");
+		if (internalLeft == null || internalMiddle == null || internalRight == null) {
+			baseMilestoneLeft = internalLeft;
+			baseMilestoneMiddle = internalMiddle;
+			baseMilestoneRight = internalRight;
+			return;
+		}
+		baseMilestoneLeft = internalLeft;
+		baseMilestoneMiddle = internalMiddle;
+		baseMilestoneRight = internalRight;
+		try {
+			String customPath = config.customSpritesPath();
+			if (customPath != null && !customPath.trim().isEmpty()) {
+				String base = customPath.trim();
+				File dir = new File(base);
+				int wLeft = internalLeft.getWidth(), hLeft = internalLeft.getHeight();
+				int wMid = internalMiddle.getWidth(), hMid = internalMiddle.getHeight();
+				int wRight = internalRight.getWidth(), hRight = internalRight.getHeight();
+				BufferedImage customLeft = ImageCache.loadImageFromFile(new File(dir, "level_up_silver/left.png"), wLeft, hLeft);
+				BufferedImage customMid = ImageCache.loadImageFromFile(new File(dir, "level_up_silver/middle.png"), wMid, hMid);
+				BufferedImage customRight = ImageCache.loadImageFromFile(new File(dir, "level_up_silver/right.png"), wRight, hRight);
+				if (customLeft != null) baseMilestoneLeft = customLeft;
+				if (customMid != null) baseMilestoneMiddle = customMid;
+				if (customRight != null) baseMilestoneRight = customRight;
+			}
+		} catch (Throwable ignored) {
+			// any error -> keep internal sprites already set above
 		}
 	}
 
 	private void updateScaledMilestoneImages(int scale) {
+		if (baseMilestoneLeft == null) {
+			loadMilestoneImages();
+		}
 		if (baseMilestoneLeft == null || (scaledMilestoneLeft != null && cachedMilestoneScale == scale)) return;
 		double s = scale / 100.0;
 		scaledMilestoneLeft = ImageUtil.resizeImage(baseMilestoneLeft, (int)(baseMilestoneLeft.getWidth() * s), (int)(baseMilestoneLeft.getHeight() * s), true);

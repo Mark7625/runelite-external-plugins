@@ -29,3 +29,51 @@ Remakes 2011 like xp and level up orbs.
   - Skill guide unlocks (new items, activities)
 - **Customizable display duration** and fade effects
 - **Scalable size** to fit your preferences
+
+### Custom sprites folder
+
+You can override the built-in sprites by setting **Custom sprites folder** in the plugin config. Use the same layout and file names as below. Only images with the exact sizes listed are loaded; anything else is ignored and the default sprite is used.
+
+| Path | Size (W×H) |
+|------|------------|
+| `globe.png` | 219 × 210 |
+| `arc.png` | 219 × 210 |
+| `level_up_silver/left.png` | (must match internal) |
+| `level_up_silver/middle.png` | (must match internal) |
+| `level_up_silver/right.png` | (must match internal) |
+| `level_up_silver/level_up_0.png` … `level_up_5.png` | 144 × 98 |
+| `level_up_gold/left.png` | (must match internal) |
+| `level_up_gold/middle.png` | (must match internal) |
+| `level_up_gold/right.png` | (must match internal) |
+| `level_up_gold/level_up_0.png` … `level_up_5.png` | 144 × 98 |
+| `numbers/0.png` … `numbers/9.png` | 33 × 48 |
+
+**Example folder structure:**
+
+```
+your-custom-folder/
+├── globe.png
+├── arc.png
+├── level_up_silver/
+│   ├── left.png
+│   ├── middle.png
+│   ├── right.png
+│   ├── level_up_0.png
+│   ├── level_up_1.png
+│   ├── level_up_2.png
+│   ├── level_up_3.png
+│   ├── level_up_4.png
+│   └── level_up_5.png
+├── level_up_gold/
+│   ├── left.png
+│   ├── middle.png
+│   ├── right.png
+│   ├── level_up_0.png
+│   └── … level_up_5.png
+└── numbers/
+    ├── 0.png
+    ├── 1.png
+    └── … 9.png
+```
+
+If any file is missing or has the wrong size, the plugin uses the internal sprite for that asset.

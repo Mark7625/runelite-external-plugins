@@ -89,8 +89,8 @@ public class XpGlobesOverlay extends Overlay {
 		this.spriteManager = spriteManager;
 		setPosition(OverlayPosition.TOP_CENTER);
 
-		this.globeImageCache = new ImageCache(RemasteredXpGlobes.class, "globe.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT);
-		this.arcImageCache = new ImageCache(RemasteredXpGlobes.class, "arc.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT);
+		this.globeImageCache = new ImageCache(RemasteredXpGlobes.class, "globe.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT, () -> config.customSpritesPath());
+		this.arcImageCache = new ImageCache(RemasteredXpGlobes.class, "arc.png", DEFAULT_ORB_WIDTH, DEFAULT_ORB_HEIGHT, () -> config.customSpritesPath());
 
 	}
 

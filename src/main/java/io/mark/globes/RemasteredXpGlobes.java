@@ -11,6 +11,7 @@ import io.mark.globes.overlay.XpGlobesOverlay;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
+import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
@@ -45,8 +46,8 @@ public class RemasteredXpGlobes extends Plugin {
 	private static final int STATS_TAB_CHILD_COUNT = 25;
 
 	private XpGlobe[] globeCache = new XpGlobe[Skill.values().length];
-	private final int[] previousLevels = new int[Skill.values().length];
-	private final boolean[] skillInitialized = new boolean[Skill.values().length];
+	private int[] previousLevels = new int[Skill.values().length];
+	private boolean[] skillInitialized = new boolean[Skill.values().length];
 	private int initializedSkillCount = 0;
 	private boolean levelsInitialized = false;
 	private long xpDropSyncPendingTime = 0;
@@ -98,6 +99,12 @@ public class RemasteredXpGlobes extends Plugin {
 		questData.load();
 		skillData.load();
 		setIconMode(false);
+
+		if (client.getGameState() == GameState.LOGGED_IN) {
+			initializeLevelTrackingFromClient();
+			overlay.initPreviousXp();
+			xpDropSyncPendingTime = System.currentTimeMillis();
+		}
 	}
 
 	@Override
@@ -109,6 +116,12 @@ public class RemasteredXpGlobes extends Plugin {
 		overlayManager.remove(overlay);
 		overlayManager.remove(levelUpOverlay);
 		setIconMode(true);
+		globeCache = new XpGlobe[Skill.values().length];
+		previousLevels = new int[Skill.values().length];
+		skillInitialized = new boolean[Skill.values().length];
+		initializedSkillCount = 0;
+		levelsInitialized = false;
+		xpDropSyncPendingTime = 0;
 	}
 
 	@Subscribe
@@ -233,8 +246,6 @@ public class RemasteredXpGlobes extends Plugin {
 				xpGlobes.stream().min(Comparator.comparing(XpGlobe::getTime)).ifPresent(xpGlobes::remove);
 			}
 		}
-
-		xpGlobes.sort(Comparator.comparing(XpGlobe::getTime));
 	}
 
 	@Schedule(period = 1, unit = ChronoUnit.SECONDS)
@@ -276,6 +287,16 @@ public class RemasteredXpGlobes extends Plugin {
 		Arrays.fill(previousLevels, 0);
 		initializedSkillCount = 0;
 		levelsInitialized = false;
+	}
+
+	private void initializeLevelTrackingFromClient() {
+		for (Skill skill : Skill.values()) {
+			int idx = skill.ordinal();
+			previousLevels[idx] = client.getRealSkillLevel(skill);
+			skillInitialized[idx] = true;
+		}
+		initializedSkillCount = Skill.values().length;
+		levelsInitialized = true;
 	}
 
 	@Subscribe

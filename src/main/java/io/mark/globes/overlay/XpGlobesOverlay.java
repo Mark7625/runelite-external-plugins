@@ -444,16 +444,11 @@ public class XpGlobesOverlay extends Overlay {
 	private double getXpProgress(XpGlobe xpGlobe) {
 		int currentLevel = xpGlobe.getCurrentLevel();
 		long currentXp = xpGlobe.getCurrentXp() & 0xFFFFFFFFL;
-		long xpForCurrentLevel = Experience.getXpForLevel(currentLevel);
 
 		int goalXpInt = xpTrackerService.getEndGoalXp(xpGlobe.getSkill());
 		long goalXp = goalXpInt & 0xFFFFFFFFL;
 		if (isGoalSet(xpGlobe.getSkill()) && goalXp > currentXp) {
-			Integer goalStartVarp = Constants.SKILL_GOAL_START_VARP.get(xpGlobe.getSkill());
-			long goalStartXp = goalStartVarp != null ? (client.getVarpValue(goalStartVarp) & 0xFFFFFFFFL) : xpForCurrentLevel;
-			if (goalStartXp <= 0 || goalStartXp < xpForCurrentLevel) {
-				goalStartXp = xpForCurrentLevel;
-			}
+			long goalStartXp = getGoalStartXp(xpGlobe.getSkill(), (int) currentXp);
 			long range = goalXp - goalStartXp;
 			if (range <= 0) {
 				return 1.0;
@@ -470,6 +465,7 @@ public class XpGlobesOverlay extends Overlay {
 			return 0.0;
 		}
 
+		long xpForCurrentLevel = Experience.getXpForLevel(currentLevel);
 		long xpForNextLevel = Experience.getXpForLevel(currentLevel + 1);
 		if (xpForNextLevel <= xpForCurrentLevel) {
 			return 0.0;
@@ -729,8 +725,8 @@ public class XpGlobesOverlay extends Overlay {
 		if (goalStartVarp == null) {
 			return Experience.getXpForLevel(Experience.getLevelForXp(currentXp));
 		}
-		long goalStartXp = client.getVarpValue(goalStartVarp);
-		if (goalStartXp <= 0) {
+		long goalStartXp = client.getVarpValue(goalStartVarp) & 0xFFFFFFFFL;
+		if (goalStartXp == 0) {
 			return Experience.getXpForLevel(Experience.getLevelForXp(currentXp));
 		}
 		return goalStartXp;

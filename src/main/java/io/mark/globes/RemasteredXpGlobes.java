@@ -16,6 +16,7 @@ import net.runelite.api.Skill;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
@@ -98,8 +99,8 @@ public class RemasteredXpGlobes extends Plugin {
 		levelsInitialized = false;
 		questData.load();
 		skillData.load();
-		setIconMode(false);
 
+		handeSkillPulseGlowState();
 		if (client.getGameState() == GameState.LOGGED_IN) {
 			initializeLevelTrackingFromClient();
 			overlay.initPreviousXp();
@@ -113,9 +114,9 @@ public class RemasteredXpGlobes extends Plugin {
 		overlay.clearCache();
 		overlay.clearXpDrops();
 		levelUpOverlay.clearCache();
+		handeSkillPulseGlowState();
 		overlayManager.remove(overlay);
 		overlayManager.remove(levelUpOverlay);
-		setIconMode(true);
 		globeCache = new XpGlobe[Skill.values().length];
 		previousLevels = new int[Skill.values().length];
 		skillInitialized = new boolean[Skill.values().length];
@@ -127,7 +128,7 @@ public class RemasteredXpGlobes extends Plugin {
 	@Subscribe
 	public void onConfigChanged(ConfigChanged configChanged) {
 		if (Objects.equals(configChanged.getKey(), "skillIconMode")) {
-			setIconMode(false);
+			handeSkillPulseGlowState();
 		}
 		if (Objects.equals(configChanged.getKey(), "customSpritesPath") || Objects.equals(configChanged.getKey(), "globeStyle")) {
 			overlay.clearCache();
@@ -384,8 +385,15 @@ public class RemasteredXpGlobes extends Plugin {
 		}
 	}
 
-	public void setIconMode(boolean forceOff) {
-		boolean hideGlow = !forceOff && config.skillIconMode() == SkillIconMode.ALPHA_PULSE;
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event) {
+		if (event.getGroupId() == InterfaceID.STATS) {
+			handeSkillPulseGlowState();
+		}
+	}
+
+	public void handeSkillPulseGlowState() {
+		boolean hideGlow = config.skillIconMode() == SkillIconMode.ALPHA_PULSE;
 
 		for (int i = 1; i <= STATS_TAB_CHILD_COUNT; i++) {
 			Widget parent = client.getWidget(InterfaceID.STATS, i);

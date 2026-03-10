@@ -30,6 +30,7 @@ import java.time.Instant;
 public class LevelUpGlobesOverlay extends Overlay {
 
 	private static final int FRAME_COUNT = 6;
+	private static final long LEVEL_UP_FRAME_DURATION_MS = 100;
 	private static final long MILESTONE_START_DELAY_MILLIS = 3000;
 	private static final long MILESTONE_DISPLAY_MILLIS = 3000;
 	private static final long ICON_DARKEN_AND_NUMBERS_START_MILLIS = 3000;
@@ -229,7 +230,11 @@ public class LevelUpGlobesOverlay extends Overlay {
 			}
 		}
 
-		int frameIndex = (int) (elapsedMillis / 200) % FRAME_COUNT;
+		long cycleMillis = FRAME_COUNT * LEVEL_UP_FRAME_DURATION_MS;
+		long timeInCycle = elapsedMillis % cycleMillis;
+		int frameIndex = (int) (timeInCycle / LEVEL_UP_FRAME_DURATION_MS) % FRAME_COUNT;
+		float frameBlend = (timeInCycle % LEVEL_UP_FRAME_DURATION_MS) / (float) LEVEL_UP_FRAME_DURATION_MS;
+
 		int scale = config.levelUpScale();
 		ImageCache orbCache = currentLevelUp.getNewLevel() >= 99
 			? goldLevelUpImageCache
@@ -260,6 +265,15 @@ public class LevelUpGlobesOverlay extends Overlay {
 		Composite old = graphics.getComposite();
 		graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
 		graphics.drawImage(image, x, y, null);
+		if (frameBlend > 0.001f) {
+			int nextIndex = (frameIndex + 1) % FRAME_COUNT;
+			BufferedImage nextImage = orbCache.getScaledImage(nextIndex, scale);
+			if (nextImage != null) {
+				graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha * frameBlend));
+				graphics.drawImage(nextImage, x, y, null);
+			}
+			graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+		}
 		drawInnerGlobe(graphics, currentLevelUp, innerX, innerY, innerWidth, innerHeight, alpha, elapsedMillis, scale);
 		graphics.setComposite(old);
 

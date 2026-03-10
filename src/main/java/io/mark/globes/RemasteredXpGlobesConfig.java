@@ -452,7 +452,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 	@ConfigItem(
 			keyName = "showMilestoneIcons",
 			name = "Show milestone icons",
-			description = "Show Milestone icons.",
+			description = "Show milestone icons.",
 			section = levelUpOrbsSection,
 			position = 35
 	)
@@ -474,22 +474,10 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "showXpLeft",
-			name = "Show until goal",
-			description = "Shows XP remaining until goal in the globe tooltip.",
-			position = 1,
-			section = xpTooltipSection
-	)
-	default boolean showXpLeft()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 			keyName = "showActionsLeft",
 			name = "Show actions left",
 			description = "Shows the number of actions left inside the globe tooltip box.",
-			position = 2,
+			position = 1,
 			section = xpTooltipSection
 	)
 	default boolean showActionsLeft()
@@ -501,7 +489,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			keyName = "showXpHour",
 			name = "Show XP/hr",
 			description = "Shows XP per hour inside the globe tooltip box.",
-			position = 3,
+			position = 2,
 			section = xpTooltipSection
 	)
 	default boolean showXpHour()
@@ -513,7 +501,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			keyName = "showTimeTilGoal",
 			name = "Show time til goal",
 			description = "Shows the amount of time until goal level in the globe tooltip box.",
-			position = 4,
+			position = 3,
 			section = xpTooltipSection
 	)
 	default boolean showTimeTilGoal()
@@ -522,22 +510,10 @@ public interface RemasteredXpGlobesConfig extends Config {
 	}
 
 	@ConfigItem(
-			keyName = "showGoalInfo",
-			name = "Show goal XP",
-			description = "Shows Goal XP and Until goal when a goal is set.",
-			position = 5,
-			section = xpTooltipSection
-	)
-	default boolean showGoalInfo()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 			keyName = "showGoalBar",
 			name = "Show goal progress bar",
 			description = "Shows a progress bar for goal completion.",
-			position = 6,
+			position = 4,
 			section = xpTooltipSection
 	)
 	default boolean showGoalBar()
@@ -549,7 +525,7 @@ public interface RemasteredXpGlobesConfig extends Config {
 			keyName = "useCompactNumbers",
 			name = "Compact number format",
 			description = "Use compact format for numbers (e.g. 1.2M instead of 1,200,000).",
-			position = 7,
+			position = 5,
 			section = xpTooltipSection
 	)
 	default boolean useCompactNumbers()

@@ -25,7 +25,7 @@ dependencies {
 }
 
 group = 'io.mark.hdminimap'
-version = '1.5'
+version = '1.6'
 sourceCompatibility = '11'
 
 tasks.withType(JavaCompile) {

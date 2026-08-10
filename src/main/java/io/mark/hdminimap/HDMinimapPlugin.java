@@ -104,7 +104,6 @@ public class HDMinimapPlugin extends Plugin {
 	@Inject
 	private EventBus eventBus;
 
-
 	@Provides
 	HDMinimapConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(HDMinimapConfig.class);
@@ -120,8 +119,7 @@ public class HDMinimapPlugin extends Plugin {
 		lastZoom = client.getMinimapZoom();
 	}
 
-	private void setupPanel()
-	{
+	private void setupPanel() {
 		mapElementManager.start(client);
 
 		panel = injector.getInstance(MinimapPanel.class);
@@ -147,7 +145,9 @@ public class HDMinimapPlugin extends Plugin {
 		client.setMinimapTileDrawer(null);
 		client.getObjectCompositionCache().reset();
 		reloadGame();
+
 		eventBus.post(new PluginMessage("117hd", "unsubscribe:event.minimap"));
+
 	}
 
 	@Subscribe
@@ -162,6 +162,9 @@ public class HDMinimapPlugin extends Plugin {
 				}
 				setMinimapDrawer();
 				log.debug("Minimap style changed to: {}", currentStyle);
+			}
+			if (Objects.equals(event.getKey(), "mapElementView")) {
+				panel.rebuild(mapElementManager,config);
 			}
 			if (Objects.equals(event.getKey(), "minimapSideBar")) {
 				if (config.displaySidebar()) {
@@ -212,8 +215,7 @@ public class HDMinimapPlugin extends Plugin {
 		double zoom = client.getMinimapZoom();
 		if (lastZoom != zoom) {
 			boolean shouldReload = false;
-			for (MapElementCategories entry : MapElementCategories.values())
-			{
+			for (MapElementCategories entry : MapElementCategories.values()) {
 				MapElementSetting setting = mapElementManager.getSetting(entry.getDefaultName());
 				Float scale = setting.getScale();
 				if (setting.isDisabled() && scale != null) {
@@ -224,8 +226,7 @@ public class HDMinimapPlugin extends Plugin {
 					}
 				}
 			}
-			if (shouldReload)
-			{
+			if (shouldReload) {
 				reloadGame();
 			}
 
@@ -303,3 +304,4 @@ public class HDMinimapPlugin extends Plugin {
 	}
 
 }
+

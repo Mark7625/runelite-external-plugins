@@ -1,5 +1,6 @@
 package io.mark.hdminimap.ui;
 
+import io.mark.hdminimap.HDMinimapConfig;
 import io.mark.hdminimap.mapelement.MapElementManager;
 import io.mark.hdminimap.mapelement.MapElementType;
 import net.runelite.client.ui.ColorScheme;
@@ -14,26 +15,55 @@ import java.awt.*;
 
 public class MinimapPanel extends PluginPanel {
 
-    @Inject
-    private MinimapPanel(MapElementManager mapElementManager)
-    {
-        super(false);
+	@Inject
+	private MinimapPanel(MapElementManager mapElementManager, HDMinimapConfig config) {
+		super(false);
 
-        setLayout(new BorderLayout());
-        setBackground(ColorScheme.DARK_GRAY_COLOR);
+		setLayout(new BorderLayout());
+		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        JPanel display = new JPanel();
-        MaterialTabGroup tabGroup = new MaterialTabGroup(display);
+		JPanel display = new JPanel();
+		MaterialTabGroup tabGroup = new MaterialTabGroup(display);
 
-        MaterialTab mapFunctionTab = new MaterialTab("Map Icons", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_FUNCTION));
-        MaterialTab mapSceneTab = new MaterialTab("Map Scenery", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_SCENERY));
+		MaterialTab mapFunctionTab = new MaterialTab("Map Icons", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_FUNCTION, config));
+		MaterialTab mapSceneTab = new MaterialTab("Map Scenery", tabGroup, new MapIconViewer(mapElementManager, MapElementType.MAP_SCENERY, config));
 
-        tabGroup.setBorder(new EmptyBorder(5, 0, 0, 0));
-        tabGroup.addTab(mapFunctionTab);
-        tabGroup.addTab(mapSceneTab);
-        tabGroup.select(mapFunctionTab);
+		tabGroup.setBorder(new EmptyBorder(5, 0, 0, 0));
+		tabGroup.addTab(mapFunctionTab);
+		tabGroup.addTab(mapSceneTab);
+		tabGroup.select(mapFunctionTab);
 
-        add(tabGroup, BorderLayout.NORTH);
-        add(display, BorderLayout.CENTER);
-    }
+		add(tabGroup, BorderLayout.NORTH);
+		add(display, BorderLayout.CENTER);
+	}
+
+	public void rebuild(MapElementManager mapElementManager, HDMinimapConfig config) {
+		removeAll();
+
+		JPanel display = new JPanel();
+		MaterialTabGroup tabGroup = new MaterialTabGroup(display);
+
+		MaterialTab mapFunctionTab = new MaterialTab(
+				"Map Icons",
+				tabGroup,
+				new MapIconViewer(mapElementManager, MapElementType.MAP_FUNCTION, config)
+		);
+
+		MaterialTab mapSceneTab = new MaterialTab(
+				"Map Scenery",
+				tabGroup,
+				new MapIconViewer(mapElementManager, MapElementType.MAP_SCENERY, config)
+		);
+
+		tabGroup.setBorder(new EmptyBorder(5, 0, 0, 0));
+		tabGroup.addTab(mapFunctionTab);
+		tabGroup.addTab(mapSceneTab);
+		tabGroup.select(mapFunctionTab);
+
+		add(tabGroup, BorderLayout.NORTH);
+		add(display, BorderLayout.CENTER);
+
+		revalidate();
+		repaint();
+	}
 }

@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum MinimapStyle {
     DEFAULT("OSRS"),
-    HD("HD");
+    HD("Shaded (HD)");
 
     private final String displayName;
 

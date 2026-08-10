@@ -70,15 +70,46 @@ public class MapElementManager {
 		return image;
 	}
 
-	public Set<String> getAlphabeticalCategories(MapElementType type, boolean includeGrouping) {
-		Set<String> categories = new LinkedHashSet<>();
+	public Set<String> getAlphabeticalCategories(MapElementType type, boolean includeGrouping)
+	{
+		List<MapElementCategories> elements = new ArrayList<>();
+
 		for (MapElementCategories element : MapElementCategories.values())
 		{
 			if (element.getType() == type)
 			{
-				categories.add((includeGrouping ? element.getGrouping() : "") + element.getDefaultName());
+				elements.add(element);
 			}
 		}
+
+		if (includeGrouping)
+		{
+			elements.sort(
+					Comparator
+							.comparing(MapElementCategories::getGrouping)
+							.thenComparing(
+									MapElementCategories::getDefaultName,
+									String.CASE_INSENSITIVE_ORDER
+							)
+			);
+		}
+		else
+		{
+			elements.sort(
+					Comparator.comparing(
+							MapElementCategories::getDefaultName,
+							String.CASE_INSENSITIVE_ORDER
+					)
+			);
+		}
+
+		Set<String> categories = new LinkedHashSet<>();
+
+		for (MapElementCategories element : elements)
+		{
+			categories.add(element.getDefaultName());
+		}
+
 		return categories;
 	}
 

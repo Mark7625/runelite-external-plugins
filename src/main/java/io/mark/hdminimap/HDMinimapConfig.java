@@ -32,8 +32,7 @@ public interface HDMinimapConfig extends Config {
 		return true;
 	}
 
-	public enum MapElementView
-	{
+	public enum MapElementView {
 		GRID,
 		LIST
 	}

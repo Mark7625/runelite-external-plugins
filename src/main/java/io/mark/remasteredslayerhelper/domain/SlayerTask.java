@@ -2,8 +2,11 @@ package io.mark.remasteredslayerhelper.domain;
 
 import io.mark.remasteredslayerhelper.data.SlayerMaster;
 import lombok.Getter;
+import net.runelite.api.Skill;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Getter
@@ -15,25 +18,34 @@ public class SlayerTask {
     private final List<SlayerMaster> slayerMasters;
     private final String[] alternatives;
     private final int slayerLevel;
+    private final int combatLevel;
     private final Item[] itemsRequired;
+    private final Map<Skill, Integer> requirementsNeedsAll;
+    private final Map<Skill, Integer> requirementsNeedsAny;
 
     public SlayerTask(
             String monster,
             int slayerLevel,
+            int combatLevel,
             String[] locations,
             Item[] itemsRequired,
             String[] attributes,
             String[] attackStyles,
             String[] alternatives,
-			List<SlayerMaster> slayerMasters) {
+			List<SlayerMaster> slayerMasters,
+			Map<Skill, Integer> requirementsNeedsAll,
+			Map<Skill, Integer> requirementsNeedsAny) {
         this.monster = Objects.requireNonNull(monster, "monster cannot be null");
         this.slayerLevel = slayerLevel;
+        this.combatLevel = combatLevel;
         this.locations = Objects.requireNonNull(locations, "locations cannot be null");
         this.itemsRequired = Objects.requireNonNull(itemsRequired, "items required cannot be null");
         this.attributes = Objects.requireNonNull(attributes, "attributes cannot be null");
         this.attackStyles = Objects.requireNonNull(attackStyles, "attack styles cannot be null");
         this.alternatives = Objects.requireNonNull(alternatives, "alternatives cannot be null");
         this.slayerMasters = slayerMasters;
+        this.requirementsNeedsAll = requirementsNeedsAll != null ? requirementsNeedsAll : Collections.emptyMap();
+        this.requirementsNeedsAny = requirementsNeedsAny != null ? requirementsNeedsAny : Collections.emptyMap();
     }
 
     public String getMonsterLowerCase() {

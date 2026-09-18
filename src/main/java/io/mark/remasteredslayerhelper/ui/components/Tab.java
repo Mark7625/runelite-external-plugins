@@ -4,6 +4,7 @@ import io.mark.remasteredslayerhelper.domain.Item;
 import io.mark.remasteredslayerhelper.util.WikiUtil;
 import lombok.Getter;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.ColorScheme;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,17 +26,17 @@ public class Tab {
         Objects.requireNonNull(items, "items cannot be null");
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(new Color(30, 30, 30));
+        contentPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         JLabel typeLabel = new JLabel(type);
         typeLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-        typeLabel.setForeground(Color.ORANGE);
+        typeLabel.setForeground(ColorScheme.BRAND_ORANGE);
         typeLabel.setHorizontalAlignment(SwingConstants.CENTER);
         typeLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         contentPanel.add(typeLabel);
         for (Item item : items) {
             String name = item.getName();
             JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-            row.setBackground(new Color(30, 30, 30));
+            row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
             if (itemManager != null && item.getItemId() != null) {
                 ImageIcon itemIcon = new ImageIcon(itemManager.getImage(item.getItemId(), 0, true));
                 row.add(new JLabel(itemIcon));
@@ -53,17 +54,17 @@ public class Tab {
         Objects.requireNonNull(icon, "icon cannot be null");
         Objects.requireNonNull(content, "content cannot be null");
         JPanel contentPanel = new JPanel();
-        contentPanel.setBackground(new Color(30, 30, 30));
+        contentPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         JLabel typeLabel = new JLabel(type);
         typeLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-        typeLabel.setForeground(Color.ORANGE);
+        typeLabel.setForeground(ColorScheme.BRAND_ORANGE);
         typeLabel.setHorizontalAlignment(SwingConstants.CENTER);
         typeLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         contentPanel.add(typeLabel);
         for (String s : content) {
             JLabel label = new JLabel(s);
             label.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-            label.setForeground(Color.WHITE);
+            label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
             label.setHorizontalAlignment(SwingConstants.CENTER);
             Container wikiButton = WikiUtil.createLinkButton(s, WikiUtil.getWikiUrl(type, s));
             contentPanel.add(wikiButton);

@@ -61,21 +61,12 @@ public class SlayerTaskRepository {
 			String name = (String) client.getDBTableField(dbTableRow, DBTableID.SlayerTask.COL_NAME_UPPERCASE, 0)[0];
 			Integer combat = (Integer) client.getDBTableField(dbTableRow, DBTableID.SlayerTask.COL_MIN_COMLEVEL, 0)[0];
 
-			Object[] stats = client.getDBTableField(dbTableRow, DBTableID.SlayerTask.COL_MIN_STAT_REQUIREMENT_ALL, 0);
-			Object[] levels = client.getDBTableField(dbTableRow, DBTableID.SlayerTask.COL_MIN_STAT_REQUIREMENT_ALL, 1);
-
-			Map<Skill, Integer> requirementsNeedsAll = new HashMap<>();
-			for (int i = 0; i < stats.length && i < levels.length; i++) {
-				Skill skill = skillMap.get((int) stats[i]);
-				Integer level = (Integer) levels[i];
-				if (skill == null || level == null) {
-					continue;
-				}
-				requirementsNeedsAll.put(skill, level);
-			}
+			Map<Skill, Integer> requirementsNeedsAll = readStatRequirements(skillMap, dbTableRow, DBTableID.SlayerTask.COL_MIN_STAT_REQUIREMENT_ALL);
+			Map<Skill, Integer> requirementsNeedsAny = readStatRequirements(skillMap, dbTableRow, DBTableID.SlayerTask.COL_MIN_STAT_REQUIREMENT_ANY);
 
 			SlayerTaskInfo info = new SlayerTaskInfo(id, name, combat);
 			info.setRequirementsNeedsAll(requirementsNeedsAll);
+			info.setRequirementsNeedsAny(requirementsNeedsAny);
 			info.setSlayerLevel(requirementsNeedsAll.getOrDefault(Skill.SLAYER, 1));
 			tasks.put(id, info);
 		}
@@ -118,6 +109,22 @@ public class SlayerTaskRepository {
 			String json = new GsonBuilder().setPrettyPrinting().create().toJson(toPrint);
 			System.out.println("--- Slayer tasks (with JSON data) ---\n" + json);
 		}
+	}
+
+	private Map<Skill, Integer> readStatRequirements(Map<Integer, Skill> skillMap, int dbTableRow, int column) {
+		Object[] stats = client.getDBTableField(dbTableRow, column, 0);
+		Object[] levels = client.getDBTableField(dbTableRow, column, 1);
+
+		Map<Skill, Integer> requirements = new HashMap<>();
+		for (int i = 0; i < stats.length && i < levels.length; i++) {
+			Skill skill = skillMap.get((int) stats[i]);
+			Integer level = (Integer) levels[i];
+			if (skill == null || level == null) {
+				continue;
+			}
+			requirements.put(skill, level);
+		}
+		return requirements;
 	}
 
 	public Collection<SlayerTaskInfo> getAllTasksWithJson() {

@@ -1,10 +1,12 @@
 package io.mark.remasteredslayerhelper.domain;
 
 import io.mark.remasteredslayerhelper.data.SlayerMaster;
+import net.runelite.api.Skill;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -18,12 +20,15 @@ public class SlayerTaskTest {
         slayerTask = new SlayerTask(
                 "Test Monster",
                 75,
+                100,
                 new String[]{"Location 1", "Location 2"},
                 new Item[]{new Item("Item 1", "item1.png"), new Item("Item 2", "item2.png")},
                 new String[]{"Attribute 1", "Attribute 2"},
                 new String[]{"Attack Style 1", "Attack Style 2"},
                 new String[]{"Alternative 1", "Alternative 2"},
-                List.of(SlayerMaster.CHAELDAR, SlayerMaster.NIEVE)
+                List.of(SlayerMaster.CHAELDAR, SlayerMaster.NIEVE),
+                Map.of(Skill.SLAYER, 75),
+                Map.of()
         );
     }
 

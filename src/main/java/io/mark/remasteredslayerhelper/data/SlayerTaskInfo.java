@@ -24,6 +24,7 @@ public class SlayerTaskInfo {
 	private String name;
 	private int combatLevel;
 	private Map<Skill, Integer> requirementsNeedsAll;
+	private Map<Skill, Integer> requirementsNeedsAny;
 
 	private int slayerLevel;
 	private List<String> locations = new ArrayList<>();
@@ -65,12 +66,15 @@ public class SlayerTaskInfo {
 		return new SlayerTask(
 			name,
 			slayerLevel,
+			combatLevel,
 			toArray(locations),
 			items,
 			toArray(attributes),
 			toArray(attackStyles),
 			toArray(alternatives),
-			slayerMasters
+			slayerMasters,
+			requirementsNeedsAll,
+			requirementsNeedsAny
 		);
 	}
 

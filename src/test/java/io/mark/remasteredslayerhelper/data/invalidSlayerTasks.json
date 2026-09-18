@@ -1,0 +1,36 @@
+[
+  {
+    "monssteeerrr": "Aberrant spectre",
+    "slaayyyeerrrr": 60,
+    "locations": [
+      "Slayer Tower",
+      "Stronghold Slayer Cave"
+    ],
+    "iiteeemmmmsss": [
+      {
+        "name": "Nose peg",
+        "icon": "Nose peg.png"
+      },
+      {
+        "name": "Slayer helmet",
+        "icon": "Slayer helmet.png"
+      }
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Magic"
+    ],
+    "alternatives": [
+      "Deviant spectre"
+    ],
+    "slayerMasters": [
+      "Vannaka",
+      "Chaeldar",
+      "Konar quo Maten",
+      "Nieve",
+      "Duradel"
+    ]
+  }
+]

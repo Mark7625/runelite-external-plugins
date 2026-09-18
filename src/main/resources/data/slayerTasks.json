@@ -1,0 +1,2426 @@
+[
+  {
+    "taskid": 41,
+    "locations": [
+      "Slayer Tower",
+      "Stronghold Slayer Cave"
+    ],
+    "itemsRequired": [
+      "Nose peg",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Magic"
+    ],
+    "alternatives": [
+      "Deviant spectre"
+    ]
+  },
+  {
+    "taskid": 42,
+    "locations": [
+      "Slayer Tower",
+      "Abyssal Area",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Demon"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Abyssal Sire"
+    ]
+  },
+  {
+    "taskid": 108,
+    "locations": [
+      "Lithkren Vault"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged",
+      "Magic",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 79,
+    "locations": [
+      "Stronghold of Security",
+      "Wilderness volcano",
+      "Stronghold Slayer Cave",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 94,
+    "locations": [
+      "God Wars Dungeon"
+    ],
+    "itemsRequired": [
+      "Ranged",
+      "Magic weaponry"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Ranged"
+    ],
+    "alternatives": [
+      "Kree'arra",
+      "Flight Kilisa",
+      "Flockleader Geerin",
+      "Wingman Skree"
+    ]
+  },
+  {
+    "taskid": 102,
+    "locations": [
+      "Bandit Camp"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 38,
+    "locations": [
+      "Slayer Tower"
+    ],
+    "itemsRequired": [
+      "Earmuffs",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Magical melee"
+    ],
+    "alternatives": [
+      "Twisted Banshee"
+    ]
+  },
+  {
+    "taskid": 43,
+    "locations": [
+      "Fremennik Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "Mirror shield",
+      "V's shield"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Basilisk Knights"
+    ]
+  },
+  {
+    "taskid": 8,
+    "locations": [
+      "Paterdomus",
+      "Morytania",
+      "Coal Trucks"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Giant bat",
+      "Albino bat",
+      "Deathwing"
+    ]
+  },
+  {
+    "taskid": 13,
+    "locations": [
+      "East Ardougne",
+      "south of Varrock",
+      "south-east of Rellekka house portal"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Black bear",
+      "Grizzly bear",
+      "Callisto"
+    ]
+  },
+  {
+    "taskid": 5,
+    "locations": [
+      "Across west Lumbridge bridge",
+      "Port Sarim pier",
+      "south of Falador"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Bird",
+      "Chicken",
+      "Mounted terrorbird gnome",
+      "Rooster",
+      "Seagull",
+      "Terrorbird",
+      "Vulture",
+      "Undead chicken"
+    ]
+  },
+  {
+    "taskid": 30,
+    "locations": [
+      "Taverley Dungeon",
+      "Edgeville Dungeon",
+      "Brimhaven Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Demon"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Demonic gorilla",
+      "Balfrug Kreeyath",
+      "Skotizo",
+      "Porazdir"
+    ]
+  },
+  {
+    "taskid": 27,
+    "locations": [
+      "Taverley Dungeon",
+      "Lava Maze",
+      "Evil Chicken's Lair"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "Baby black dragon",
+      "King Black Dragon",
+      "Brutal black dragon"
+    ]
+  },
+  {
+    "taskid": 119,
+    "locations": [
+      "Lava Maze",
+      "north of Venenatis"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 48,
+    "locations": [
+      "Slayer Tower",
+      "God Wars Dungeon",
+      "Meiyerditch Dungeon",
+      "Stronghold Slayer Cave"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magical melee"
+    ],
+    "alternatives": [
+      "Mutated Bloodveld"
+    ]
+  },
+  {
+    "taskid": 25,
+    "locations": [
+      "Taverley Dungeon",
+      "Ogre Enclave",
+      "Heroes' Guild",
+      "Corsair Cove Dungeon"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "Baby blue dragon",
+      "Brutal blue dragon",
+      "Vorkath"
+    ]
+  },
+  {
+    "taskid": 84,
+    "locations": [
+      "Brine Rat Cavern"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 58,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire",
+      "Ranged Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 78,
+    "locations": [
+      "Stronghold of Security"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magic"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 63,
+    "locations": [
+      "Lumbridge Swamp Caves",
+      "Dorgesh-Kaan South Dungeon"
+    ],
+    "itemsRequired": [
+      "Bullseye lantern (lit)"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 37,
+    "locations": [
+      "Fremennik Slayer Dungeon",
+      "Lumbridge Swamp Caves",
+      "Dorgesh-Kaan South Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Poison"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 80,
+    "locations": [
+      "Mos Le'Harmless Cave"
+    ],
+    "itemsRequired": [
+      "Witchwood icon",
+      "Bullseye lantern (lit)"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magical melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 62,
+    "locations": [
+      "Lumbridge Swamp Caves",
+      "Dorgesh-Kaan South Dungeon"
+    ],
+    "itemsRequired": [
+      "Bullseye lantern (lit)"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Poison"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 92,
+    "locations": [
+      "Kraken Cove"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magic"
+    ],
+    "alternatives": [
+      "Kraken"
+    ]
+  },
+  {
+    "taskid": 110,
+    "locations": [
+      "Edgeville Dungeon",
+      "Chaos Temple"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Elder Chaos druid"
+    ]
+  },
+  {
+    "taskid": 44,
+    "locations": [
+      "Fremennik Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "Mirror shield",
+      "V's shield"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 6,
+    "locations": [
+      "South of Falador",
+      "North of Al-Kharid gate",
+      "Various locations"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Cow calf",
+      "Undead cow"
+    ]
+  },
+  {
+    "taskid": 39,
+    "locations": [
+      "Slayer Tower"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Crush"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 65,
+    "locations": [
+      "Near Elid",
+      "Southern shore of Kharidian Desert"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 35,
+    "locations": [
+      "Lighthouse",
+      "Waterbirth Island Dungeon",
+      "Catacombs of Kourend",
+      "Jormungand's Prison"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Ranged or Melee"
+    ],
+    "alternatives": [
+      "Dagannoth fledgeling",
+      "Dagannoth spawn",
+      "Dagannoth Prime",
+      "Dagannoth Rex",
+      "Dagannoth Supreme"
+    ]
+  },
+  {
+    "taskid": 66,
+    "locations": [
+      "Path to Temple of Light (Mourner tunnels)",
+      "Iorwerth Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 103,
+    "locations": [
+      "Dark Warriors' Fortress"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 22,
+    "locations": [
+      "Ardougne",
+      "McGrubor's Wood",
+      "Black Arm Gang hideout in Brimhaven",
+      "Brimhaven Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Guard dog",
+      "Wild dog",
+      "Jackal",
+      "Temple Guardian"
+    ]
+  },
+  {
+    "taskid": 112,
+    "locations": [
+      "Karuulm Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "Boots of stone",
+      "Boots of brimstone",
+      "Granite boots"
+    ],
+    "attributes": [
+      "Draconic"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 49,
+    "locations": [
+      "Smoke Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "Facemask",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 57,
+    "locations": [
+      "Ice Mountain",
+      "Mining Guild",
+      "Keldagrim",
+      "Dwarven Mine",
+      "beneath White Wolf Mountain",
+      "south of Yanille"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Black Guard",
+      "Chaos dwarf"
+    ]
+  },
+  {
+    "taskid": 54,
+    "locations": [
+      "Edgeville Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 56,
+    "locations": [
+      "Lletya",
+      "Iorwerth Camp",
+      "Prifddinas"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee or ranged"
+    ],
+    "alternatives": [
+      "Mourner (Lvl 108 variant only)"
+    ]
+  },
+  {
+    "taskid": 101,
+    "locations": [
+      "Forests north and east of the Chaos Temple"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 69,
+    "locations": [
+      "Braindeath Island (brewery basement)"
+    ],
+    "itemsRequired": [
+      "Slayer gloves"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 16,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Deep Wilderness Dungeon",
+      "Smoke Dungeon",
+      "Waterfall Dungeon",
+      "Stronghold Slayer Cave",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "locations": [
+      "Stronghold of Security (level 2)"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 106,
+    "locations": [
+      "Wyvern Cave"
+    ],
+    "itemsRequired": [
+      "Elemental shield",
+      "Mind shield",
+      "Dragonfire shield",
+      "Ancient wyvern shield"
+    ],
+    "attributes": [
+      "Draconic"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged",
+      "Icy breath"
+    ],
+    "alternatives": [
+      "Ancient wyvern",
+      "Spitting wyvern",
+      "Taloned wyvern",
+      "Long-tailed wyvern"
+    ]
+  },
+  {
+    "taskid": 46,
+    "locations": [
+      "Slayer Tower"
+    ],
+    "itemsRequired": [
+      "Rock hammer",
+      "Rock thrownhammer"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Grotesque Guardians"
+    ]
+  },
+  {
+    "taskid": 12,
+    "locations": [
+      "Varrock Sewers",
+      "Draynor Manor",
+      "Melzar's Maze",
+      "Stronghold of Security",
+      "Taverley Dungeon",
+      "West Ardougne (graveyard)",
+      "Scorpius Shrine",
+      "Lair of Tarn Razorlor",
+      "Death altar",
+      "Haunted Mine",
+      "near Clan Wars",
+      "Forgotten Cemetery",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Tortured soul"
+    ]
+  },
+  {
+    "taskid": 23,
+    "locations": [
+      "West of Canifis"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Ghoul Champion"
+    ]
+  },
+  {
+    "taskid": 2,
+    "locations": [
+      "Lumbridge Caves",
+      "Goblin Village",
+      "Port Sarim",
+      "around the Digsite",
+      "Stronghold of Security",
+      "Underground Pass",
+      "Goblin Cave",
+      "Coal Trucks",
+      "holes in Myreque Hideout in Mort Myre",
+      "God Wars Dungeon (Bandos God Wars minions)",
+      "cave near Observatory",
+      "Dwarven coal mine",
+      "east of Barbarian Village"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Goblin Champion",
+      "Sergeant Strongstack",
+      "Sergeant Grimspike",
+      "Sergeant Steelwill"
+    ]
+  },
+  {
+    "taskid": 29,
+    "locations": [
+      "Entrana Dungeon",
+      "Brimhaven Dungeon",
+      "Ogre Enclave",
+      "Demonic Ruins",
+      "Wilderness Volcano",
+      "Lava Maze Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Demon"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "K'ril Tsutsaroth",
+      "Tstanon Karlak",
+      "Skotizo"
+    ]
+  },
+  {
+    "taskid": 24,
+    "locations": [
+      "West of the Dark Warriors' Fortress",
+      "north of the Graveyard of Shadows",
+      "South of the Lava Maze",
+      "South of Venenatis",
+      "Corsair Cove Dungeon (Requires completion of Dragon Slayer II)"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "Baby green dragon",
+      "Brutal green dragon",
+      "Elvarg"
+    ]
+  },
+  {
+    "taskid": 70,
+    "locations": [
+      "Karamja"
+    ],
+    "itemsRequired": [
+      "Lit bug lantern"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 31,
+    "locations": [
+      "Taverley Dungeon",
+      "east of the Deserted Keep",
+      "Karuulm Slayer Dungeon",
+      "Witchaven Shrine Dungeon",
+      "God Wars Dungeon",
+      "Wilderness Volcano",
+      "Stronghold Slayer Cave",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Cerberus"
+    ]
+  },
+  {
+    "taskid": 14,
+    "locations": [
+      "Deep Wilderness Dungeon",
+      "Edgeville Dungeon",
+      "Gnome Stronghold",
+      "Lava Maze",
+      "north of Observatory",
+      "Taverley Dungeon",
+      "Tree Gnome Village",
+      "Wilderness",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Giant Champion",
+      "Cyclops"
+    ]
+  },
+  {
+    "taskid": 21,
+    "locations": [
+      "Asgarnian Ice Dungeon",
+      "Crandor",
+      "Hobgoblin Peninsula near Crafting Guild",
+      "Edgeville Dungeon",
+      "God Wars Dungeon",
+      "near Karamja Hunter area",
+      "north of Outpost",
+      "north of Rellekka",
+      "Tree Gnome Village dungeon",
+      "Waterbirth Island",
+      "Wilderness Hobgoblin Mine",
+      "Witchaven Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Hobgoblin Champion"
+    ]
+  },
+  {
+    "taskid": 113,
+    "locations": [
+      "Karuulm Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Draconic"
+    ],
+    "attackStyles": [
+      "Magic",
+      "Ranged",
+      "Poison"
+    ],
+    "alternatives": [
+      "Alchemical Hydra"
+    ]
+  },
+  {
+    "taskid": 75,
+    "locations": [
+      "Ice Mountain",
+      "God Wars Dungeon",
+      "Wilderness God Wars Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magic",
+      "Ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 15,
+    "locations": [
+      "Asgarnian Ice Caves",
+      "Frozen Waste Plateau",
+      "White Wolf Mountain"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 19,
+    "locations": [
+      "White Wolf Mountain",
+      "Frozen Waste Plateau",
+      "Asgarnian Ice Caves"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Icelord"
+    ]
+  },
+  {
+    "taskid": 40,
+    "locations": [
+      "Slayer tower"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magic"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 59,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 50,
+    "locations": [
+      "Fremennik Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magical melee"
+    ],
+    "alternatives": [
+      "Warped Jelly"
+    ]
+  },
+  {
+    "taskid": 81,
+    "locations": [
+      "Mos Le'Harmless"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 53,
+    "locations": [
+      "Kalphite Lair",
+      "Kalphite Cave"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Kalphite"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Kalphite Queen",
+      "Kalphite Worker",
+      "Kalphite Soldier",
+      "Kalphite Guardian"
+    ]
+  },
+  {
+    "taskid": 73,
+    "locations": [
+      "Killerwatt plane"
+    ],
+    "itemsRequired": [
+      "Insulated boots"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magical melee",
+      "ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 45,
+    "locations": [
+      "Fremennik Slayer Dungeon",
+      "Iorwerth Dungeon"
+    ],
+    "itemsRequired": [
+      "Leaf-bladed spear",
+      "Magic Dart",
+      "Broad arrows",
+      "Broad bolts"
+    ],
+    "attributes": [
+      "Leafy"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 104,
+    "locations": [
+      "Lava Dragon Isle"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 28,
+    "locations": [
+      "Wizards' Tower",
+      "Karamja Dungeon",
+      "Crandor",
+      "Melzar's Maze",
+      "Demonic Ruins",
+      "Lava Maze",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Demon"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Zakl'n Gritch"
+    ]
+  },
+  {
+    "taskid": 90,
+    "locations": [
+      "Lizardmen Settlement",
+      "Lizardman canyon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged"
+    ],
+    "alternatives": [
+      "Lizardman brute",
+      "Lizardman shaman"
+    ]
+  },
+  {
+    "taskid": 68,
+    "locations": [
+      "Kharidian Desert"
+    ],
+    "itemsRequired": [
+      "Ice cooler"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Desert Lizard",
+      "Lizard",
+      "Small Lizard",
+      "Sulphur Lizard"
+    ]
+  },
+  {
+    "taskid": 91,
+    "locations": [
+      "Magic Axe Hut"
+    ],
+    "itemsRequired": [
+      "Lockpick"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 99,
+    "locations": [
+      "West of the Chaos Temple"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 76,
+    "locations": [
+      "Stronghold of Security"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 93,
+    "locations": [
+      "Ancient Cavern"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magic",
+      "Ranged",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 67,
+    "locations": [
+      "Mudskipper Point"
+    ],
+    "itemsRequired": [
+      "Fishing explosive"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 87,
+    "locations": [
+      "Dorgesh-Kaan South Dungeon"
+    ],
+    "itemsRequired": [
+      "Slayer bell"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 1,
+    "locations": [
+      "Karamja",
+      "Mos Le'Harmless",
+      "Ardougne Zoo"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Monkey Guard",
+      "Monkey Archer",
+      "Zombie monkey and more (like Padulah)"
+    ]
+  },
+  {
+    "taskid": 17,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Crandor",
+      "west of Fishing Guild",
+      "Moss Giant Island",
+      "Wilderness",
+      "Varrock Sewers",
+      "Pirates' Cove",
+      "Glarial's Tomb",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 52,
+    "locations": [
+      "Slayer Tower",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Demon"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 20,
+    "locations": [
+      "Gu'Tanoth",
+      "west of Yanille",
+      "south of Castle Wars",
+      "south of Gu'Tanoth",
+      "Toban 's Island",
+      "Chaos Druid Tower dungeon",
+      "Clock Tower Dungeon",
+      "Witchaven Dungeon",
+      "Underground Pass",
+      "Combat Training Camp",
+      "God Wars Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Ogre chieftain",
+      "Enclave guard",
+      "Ogress Shaman",
+      "Ogress Warrior"
+    ]
+  },
+  {
+    "taskid": 55,
+    "locations": [
+      "Zanaris"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 120,
+    "locations": [
+      "Pirates' Hideout"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 47,
+    "locations": [
+      "Fremennik Slayer Dungeon",
+      "Smoke Dungeon",
+      "God Wars Dungeon",
+      "Wilderness God Wars Dungeon",
+      "Iorwerth Dungeon,"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Magical melee"
+    ],
+    "alternatives": [
+      "Pyrelord"
+    ]
+  },
+  {
+    "taskid": 3,
+    "locations": [
+      "Throughout Gielinor"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Giant rat",
+      "Dungeon rat",
+      "Crypt rat",
+      "Brine rat",
+      "Hell-Rat Behemoth"
+    ]
+  },
+  {
+    "taskid": 26,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Catacombs of Kourend (brutal variant)"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "Baby red dragons",
+      "Brutal red dragons"
+    ]
+  },
+  {
+    "taskid": 107,
+    "locations": [
+      "Revenant Caves"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged",
+      "Magic"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 51,
+    "locations": [
+      "Fremennik Slayer Dungeon",
+      "Lumbridge Swamp Caves",
+      "Dorgesh-Kaan South Dungeon"
+    ],
+    "itemsRequired": [
+      "Bag of salt"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 100,
+    "locations": [
+      "Rogues' Castle",
+      "southwest of Mage Arena"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 109,
+    "locations": [
+      "Lithkren"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Super antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Slash",
+      "Ranged",
+      "Magic",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 85,
+    "locations": [
+      "Dungeon under Sophanem",
+      "dungeon east of the Agility Pyramid"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Kalphite"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magic",
+      "Ranged"
+    ],
+    "alternatives": [
+      "Locust riders",
+      "Scarab mages",
+      "Scarab swarms"
+    ]
+  },
+  {
+    "taskid": 7,
+    "locations": [
+      "Al-Kharid Mine",
+      "Dwarven mines",
+      "Ardougne Zoo Scorpion Pit",
+      "Stronghold of Security",
+      "Varrock Sewers",
+      "Wilderness",
+      "above Karamja Volcano"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "King Scorpion",
+      "Poison Scorpion",
+      "Pit Scorpion",
+      "Scorpia",
+      "Lobstrosity"
+    ]
+  },
+  {
+    "taskid": 71,
+    "locations": [
+      "Miscellania & Etceteria Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee (and Ranged for Giant Sea Snake)"
+    ],
+    "alternatives": [
+      "Sea Snake Hatchling",
+      "Sea Snake Young",
+      "Giant Sea Snake"
+    ]
+  },
+  {
+    "taskid": 64,
+    "locations": [
+      "Mort'ton",
+      "Shade Catacombs",
+      "Temple Trekking",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Shade",
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Loar",
+      "Phryn",
+      "Riyl",
+      "Asyn and Fiyr shades"
+    ]
+  },
+  {
+    "taskid": 32,
+    "locations": [
+      "Legends' Guild basement"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 72,
+    "locations": [
+      "Asgarnian Ice Dungeon"
+    ],
+    "itemsRequired": [
+      "Elemental shield",
+      "Mind shield",
+      "Dragonfire shield"
+    ],
+    "attributes": [
+      "Draconic"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged",
+      "Icy breath"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 11,
+    "locations": [
+      "Edgeville Dungeon",
+      "Draynor Sewers",
+      "Karamja Volcano",
+      "Ogre Enclave",
+      "Stronghold of Security",
+      "Taverley Dungeon",
+      "Temple of Ikov",
+      "Varrock Sewers",
+      "Waterfall Dungeon",
+      "Wilderness Agility Course",
+      "Barrows",
+      "Melzar's Maze",
+      "Wilderness Volcano",
+      "Ape Atoll Dungeon",
+      "Underground Pass"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Skeleton Champion",
+      "Vet'ion"
+    ]
+  },
+  {
+    "taskid": 95,
+    "locations": [
+      "Smoke Devil Dungeon"
+    ],
+    "itemsRequired": [
+      "Facemask",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magical ranged"
+    ],
+    "alternatives": [
+      "Thermonuclear smoke devil",
+      "Nuclear smoke devil"
+    ]
+  },
+  {
+    "taskid": 121,
+    "locations": [
+      "Sourhog Cave"
+    ],
+    "itemsRequired": [
+      "Reinforced goggles",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 4,
+    "locations": [
+      "Melzar's Maze",
+      "Sorceress 's house",
+      "Lumbridge Castle basement",
+      "behind Lumbridge Castle",
+      "Stronghold of Security",
+      "Ape Atoll temple",
+      "Ogre Enclave",
+      "Wilderness",
+      "Karamja",
+      "Underground Pass"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Giant spider",
+      "Shadow spider",
+      "Jungle spider",
+      "Deadly red spider",
+      "Poison spider",
+      "Blessed spider",
+      "Kalrag",
+      "Crypt spider",
+      "Temple Spider",
+      "Sarachnis",
+      "Venenatis"
+    ]
+  },
+  {
+    "taskid": 89,
+    "locations": [
+      "God Wars Dungeon",
+      "Wilderness God Wars Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Varies with target"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 60,
+    "locations": [
+      "Brimhaven Dungeon",
+      "Catacombs of Kourend"
+    ],
+    "itemsRequired": [
+      "Anti-dragon shield",
+      "Dragonfire shield",
+      "Antifire potion(4)"
+    ],
+    "attributes": [
+      "Draconic",
+      "Fiery"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Dragonfire"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 83,
+    "locations": [
+      "Lunar Isle"
+    ],
+    "itemsRequired": [
+      "None (Seal of passage recommended to communicate with Moon Clan people)"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magic"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 86,
+    "locations": [
+      "Tarn's Lair"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 18,
+    "locations": [
+      "Trollheim",
+      "Tunnel outside of Keldagrim",
+      "Death Plateau (Mountain troll)",
+      "Icy islands north of Neitiznot and Jatizso",
+      "Ice Path north of Trollheim (Ice trolls)"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged"
+    ],
+    "alternatives": [
+      "Mountain troll",
+      "Ice troll grunt",
+      "Runt",
+      "Male and Female",
+      "Ice troll",
+      "River troll"
+    ]
+  },
+  {
+    "taskid": 36,
+    "locations": [
+      "Fremennik Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "Leaf-bladed spear",
+      "Magic Dart",
+      "Broad arrows",
+      "Broad bolts"
+    ],
+    "attributes": [
+      "Leafy"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 96,
+    "locations": [
+      "Mor Ul Rek"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Ranged",
+      "Magic"
+    ],
+    "alternatives": [
+      "TzTok-Jad",
+      "TzKal-Zuk"
+    ]
+  },
+  {
+    "taskid": 34,
+    "locations": [
+      "God Wars Dungeon",
+      "Wilderness God Wars Dungeon",
+      "Haunted Woods",
+      "near Abandoned Mine"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Vampyre"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 61,
+    "locations": [
+      "Lumbridge Swamp Caves"
+    ],
+    "itemsRequired": [
+      "Spiny helmet",
+      "Slayer helmet"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 88,
+    "locations": [
+      "Ancient Cavern",
+      "Kraken Cove"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magic",
+      "Magical ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 33,
+    "locations": [
+      "Canifis",
+      "God Wars Dungeon",
+      "Wilderness God Wars Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 9,
+    "locations": [
+      "Stronghold of Security",
+      "White Wolf Mountain",
+      "Feldip Hills"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Big Wolf",
+      "Dire wolf",
+      "Jungle wolf",
+      "Desert Wolf",
+      "Ice Wolf"
+    ]
+  },
+  {
+    "taskid": 111,
+    "locations": [
+      "Karuulm Slayer Dungeon"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Draconic"
+    ],
+    "attackStyles": [
+      "Melee",
+      "Magical ranged"
+    ],
+    "alternatives": [
+      "None"
+    ]
+  },
+  {
+    "taskid": 10,
+    "locations": [
+      "Tree Gnome Village dungeon",
+      "Entrana Dungeon",
+      "Edgeville Dungeon",
+      "Graveyard of Shadows",
+      "Stronghold of Security",
+      "Varrock Sewers",
+      "Wizards' Guild basement",
+      "Draynor Sewers",
+      "Lair of Tarn Razorlor"
+    ],
+    "itemsRequired": [
+      "None"
+    ],
+    "attributes": [
+      "Undead"
+    ],
+    "attackStyles": [
+      "Melee"
+    ],
+    "alternatives": [
+      "Any zombie-class except Zogres and Zombie monkeys"
+    ]
+  },
+  {
+    "taskid": 74,
+    "locations": [
+      "Fossil Island",
+      "Zanaris"
+    ],
+    "itemsRequired": [
+      "Fungicide spray",
+      "Fungicide"
+    ],
+    "attributes": [
+      "None"
+    ],
+    "attackStyles": [
+      "Magical melee",
+      "Magical ranged"
+    ],
+    "alternatives": [
+      "Ancient Zygomite"
+    ]
+  }
+]

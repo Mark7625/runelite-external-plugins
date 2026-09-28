@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -60,9 +59,6 @@ import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
 @Slf4j
 @Singleton
 public class HdItemIcons extends WidgetItemOverlay {
-	private static final int MAX_CACHED_ICONS = 2048;
-	private static final int MAX_CACHED_REFERENCES = 2048;
-	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
 	private static final int INPAINT_PASSES = 3;
 
@@ -189,32 +185,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private Filepath iconCacheDirectory;
 
-	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<Long, RenderedIcon> eldest) {
-			return size() > MAX_CACHED_ICONS;
-		}
-	};
-	private final Map<Long, ReferenceIcon> referenceIcons = new LinkedHashMap<>(MAX_CACHED_REFERENCES, .75f, true) {
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<Long, ReferenceIcon> eldest) {
-			return size() > MAX_CACHED_REFERENCES;
-		}
-	};
-	private final Map<Long, Integer> resolvedStackModels = new LinkedHashMap<>(MAX_CACHED_STACK_MODELS, .75f, true) {
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<Long, Integer> eldest) {
-			return size() > MAX_CACHED_STACK_MODELS;
-		}
-	};
-	// Not access-ordered: an in-progress search must keep its resume point until it either
-	// finishes or is evicted for staying idle the longest, not for being actively read.
-	private final Map<Long, Integer> stackModelSearchProgress = new LinkedHashMap<>(MAX_CACHED_STACK_MODELS, .75f, false) {
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<Long, Integer> eldest) {
-			return size() > MAX_CACHED_STACK_MODELS;
-		}
-	};
+	// Unbounded: entries are small and their number is bounded in practice by the number of
+	// distinct (item, quantity, border) combinations the client can actually show, so capping
+	// and evicting them just caused large banks to never finish rendering.
+	private final Map<Long, RenderedIcon> renderedIcons = new HashMap<>();
+	private final Map<Long, ReferenceIcon> referenceIcons = new HashMap<>();
+	private final Map<Long, Integer> resolvedStackModels = new HashMap<>();
+	private final Map<Long, Integer> stackModelSearchProgress = new HashMap<>();
 	private final Map<Integer, Item[]> watchedContainers = new HashMap<>();
 	// Containers whose items have all already been queued for a render (or found ineligible),
 	// so the prefetch pass can skip re-scanning them every frame - this matters a lot for the
@@ -453,8 +430,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 			boolean settled = true;
 			for (Item item : entry.getValue()) {
-				if (renderedIcons.size() >= MAX_CACHED_ICONS)
-					return;
 				if (item.getId() != -1 && resolveIcon(item.getId(), item.getQuantity(), ItemQuantityMode.NEVER, 1, false) == PENDING) {
 					settled = false;
 					break;

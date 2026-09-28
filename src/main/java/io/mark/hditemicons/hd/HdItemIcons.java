@@ -60,7 +60,7 @@ import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
 @Slf4j
 @Singleton
 public class HdItemIcons extends WidgetItemOverlay {
-	private static final int MAX_CACHED_ICONS = 1024;
+	private static final int MAX_CACHED_ICONS = 2048;
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;

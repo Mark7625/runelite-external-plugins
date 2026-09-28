@@ -13,7 +13,8 @@ import net.runelite.client.plugins.PluginDescriptor;
 @PluginDescriptor(
 	name = "HQ Item Icons",
 	description = "Sharper, high quality item icons",
-	tags = {"hq", "hd", "item", "icons", "inventory", "bank", "antialiasing"}
+	tags = {"hq", "hd", "item", "icons", "inventory", "bank", "antialiasing"},
+	internalName = "hd-item-icons"
 )
 public class HdItemIconsPlugin extends Plugin {
 

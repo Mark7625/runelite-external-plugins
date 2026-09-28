@@ -2,10 +2,9 @@ package io.mark.hditemicons;
 
 import com.google.inject.Provides;
 import io.mark.hditemicons.hd.HdItemIcons;
-import java.io.File;
+import java.io.IOException;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.RuneLite;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -27,9 +26,8 @@ public class HdItemIconsPlugin extends Plugin {
 	}
 
 	@Override
-	protected void startUp() {
-		File dataDirectory = new File(new File(RuneLite.RUNELITE_DIR, "plugin-data"), "hd-item-icons");
-		hdItemIcons.startUp(dataDirectory);
+	protected void startUp() throws IOException {
+		hdItemIcons.startUp(getPluginDirectory());
 	}
 
 	@Override

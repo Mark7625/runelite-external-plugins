@@ -120,6 +120,13 @@ class ItemIconRasterizer {
 	private final double[] posX, posY, posZ;
 	private double centerOffsetX, centerOffsetY, cameraDistance;
 
+	// Scratch buffers reused across the many renderSamples() calls a single fit performs
+	// (up to FIT_ITERATIONS wide renders plus the final render), to avoid re-allocating
+	// vertex-sized and face-sized arrays on every call.
+	private final double[] camX, camY, camZ, screenX, screenY;
+	private final long[] sortKeysScratch;
+	private int[] samplesScratch;
+
 	/**
 	 * @param supersample how many samples per axis (so {@code supersample * supersample} samples
 	 *                    per pixel) to render before downsampling - the plugin's configurable
@@ -158,6 +165,13 @@ class ItemIconRasterizer {
 			posY[i] = y;
 			posZ[i] = z;
 		}
+
+		camX = new double[vertexCount];
+		camY = new double[vertexCount];
+		camZ = new double[vertexCount];
+		screenX = new double[vertexCount];
+		screenY = new double[vertexCount];
+		sortKeysScratch = new long[model.triangleA.length];
 	}
 
 	private static double[] rotate(double u, double v, double angle) {
@@ -325,11 +339,6 @@ class ItemIconRasterizer {
 	private int[] renderSamples(double distance, double scaleX, double scaleY, double left, double top,
 								int width, int height, int outlineWidth, int[] palette) {
 		int vertexCount = posX.length;
-		double[] camX = new double[vertexCount];
-		double[] camY = new double[vertexCount];
-		double[] camZ = new double[vertexCount];
-		double[] screenX = new double[vertexCount];
-		double[] screenY = new double[vertexCount];
 		for (int i = 0; i < vertexCount; i++) {
 			camX[i] = posX[i] + centerOffsetX;
 			camY[i] = posY[i] + centerOffsetY;
@@ -342,7 +351,7 @@ class ItemIconRasterizer {
 
 		int samplesWide = width * supersample;
 		int samplesHigh = height * supersample;
-		int[] samples = new int[samplesWide * samplesHigh];
+		int[] samples = obtainSamplesBuffer(samplesWide * samplesHigh);
 		for (int face : paintOrder(screenX, screenY, camZ))
 			paintFace(face, screenX, screenY, camX, camY, camZ, rayScaleX, rayOffsetX, rayScaleY, rayOffsetY,
 				samplesWide, samplesHigh, palette, samples);
@@ -350,6 +359,14 @@ class ItemIconRasterizer {
 			growOutline(samples, samplesWide, samplesHigh, scaleX, scaleY, outlineWidth);
 
 		return downsample(samples, samplesWide, width, height);
+	}
+
+	private int[] obtainSamplesBuffer(int size) {
+		if (samplesScratch == null || samplesScratch.length != size)
+			samplesScratch = new int[size];
+		else
+			Arrays.fill(samplesScratch, 0);
+		return samplesScratch;
 	}
 
 	private int[] downsample(int[] samples, int samplesWide, int width, int height) {
@@ -388,7 +405,7 @@ class ItemIconRasterizer {
 	 */
 	private int[] paintOrder(double[] screenX, double[] screenY, double[] depth) {
 		int faceCount = model.triangleA.length;
-		long[] sortKeys = new long[faceCount];
+		long[] sortKeys = sortKeysScratch;
 		int visibleCount = 0;
 		for (int f = 0; f < faceCount; f++) {
 			if (model.shadeC[f] == -2)
@@ -402,13 +419,12 @@ class ItemIconRasterizer {
 			sortKeys[visibleCount] = ((long) -faceDepth << 32) | (f & 0xFFFFFFFFL);
 			visibleCount++;
 		}
-		long[] keys = Arrays.copyOf(sortKeys, visibleCount);
-		Arrays.sort(keys);
+		Arrays.sort(sortKeys, 0, visibleCount);
 		int[] depthOrder = new int[visibleCount];
 		int[] depthOrderDepth = new int[visibleCount];
 		for (int i = 0; i < visibleCount; i++) {
-			depthOrder[i] = (int) keys[i];
-			depthOrderDepth[i] = (int) -(keys[i] >> 32);
+			depthOrder[i] = (int) sortKeys[i];
+			depthOrderDepth[i] = (int) -(sortKeys[i] >> 32);
 		}
 
 		if (model.paintLayer == null)

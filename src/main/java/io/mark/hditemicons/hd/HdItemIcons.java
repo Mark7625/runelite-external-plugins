@@ -64,6 +64,7 @@ import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
 public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MAX_CACHED_ICONS = 1024;
 	private static final int MAX_CACHED_REFERENCES = 2048;
+	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
 	private static final int INPAINT_PASSES = 3;
 
@@ -190,15 +191,32 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private File iconCacheDirectory;
 
-	private final Map<Long, RenderedIcon> renderedIcons = new HashMap<>();
+	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Long, RenderedIcon> eldest) {
+			return size() > MAX_CACHED_ICONS;
+		}
+	};
 	private final Map<Long, ReferenceIcon> referenceIcons = new LinkedHashMap<>(MAX_CACHED_REFERENCES, .75f, true) {
 		@Override
 		protected boolean removeEldestEntry(Map.Entry<Long, ReferenceIcon> eldest) {
 			return size() > MAX_CACHED_REFERENCES;
 		}
 	};
-	private final Map<Long, Integer> resolvedStackModels = new HashMap<>();
-	private final Map<Long, Integer> stackModelSearchProgress = new HashMap<>();
+	private final Map<Long, Integer> resolvedStackModels = new LinkedHashMap<>(MAX_CACHED_STACK_MODELS, .75f, true) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Long, Integer> eldest) {
+			return size() > MAX_CACHED_STACK_MODELS;
+		}
+	};
+	// Not access-ordered: an in-progress search must keep its resume point until it either
+	// finishes or is evicted for staying idle the longest, not for being actively read.
+	private final Map<Long, Integer> stackModelSearchProgress = new LinkedHashMap<>(MAX_CACHED_STACK_MODELS, .75f, false) {
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Long, Integer> eldest) {
+			return size() > MAX_CACHED_STACK_MODELS;
+		}
+	};
 	private final Map<Integer, Item[]> watchedContainers = new HashMap<>();
 	// Containers whose items have all already been queued for a render (or found ineligible),
 	// so the prefetch pass can skip re-scanning them every frame - this matters a lot for the
@@ -401,8 +419,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (icon == null) {
 			if (!consumeRenderBudget(visibleNow))
 				return PENDING;
-			if (renderedIcons.size() >= MAX_CACHED_ICONS)
-				renderedIcons.clear();
 
 			icon = new RenderedIcon();
 			int modelItemId = resolveModelItemId(itemId, quantity, borderWidth, reference);

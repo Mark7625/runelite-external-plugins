@@ -8,9 +8,6 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -43,6 +40,7 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.WidgetItemOverlay;
+import net.runelite.client.util.Filepath;
 
 import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_HEIGHT;
 import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
@@ -189,7 +187,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private IconQuality lastKnownQuality;
 	@Nullable
-	private File iconCacheDirectory;
+	private Filepath iconCacheDirectory;
 
 	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
 		@Override
@@ -248,12 +246,11 @@ public class HdItemIcons extends WidgetItemOverlay {
 	}
 
 	/**
-	 * @param dataDirectory the plugin's data directory under {@code .runelite/}. Only used if
-	 *                      the disk icon cache is enabled in config.
+	 * @param dataDirectory the plugin's data directory. Only used if the disk icon cache is
+	 *                      enabled in config.
 	 */
-	public void startUp(File dataDirectory) {
-		int workerCount = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
-		renderExecutor = Executors.newFixedThreadPool(workerCount, runnable -> {
+	public void startUp(Filepath dataDirectory) {
+		renderExecutor = Executors.newFixedThreadPool(config.renderThreadCount(), runnable -> {
 			Thread thread = new Thread(runnable, "hd-item-icon-renderer");
 			thread.setDaemon(true);
 			return thread;
@@ -261,10 +258,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		iconCacheDirectory = null;
 		if (config.iconCacheStorage() == IconCacheStorage.DISK) {
-			if (dataDirectory.isDirectory() || dataDirectory.mkdirs())
+			try {
+				if (!dataDirectory.isDirectory())
+					dataDirectory.createDirectories();
 				iconCacheDirectory = dataDirectory;
-			else
-				log.debug("Couldn't create the disk icon cache directory {}; falling back to memory only", dataDirectory);
+			} catch (IOException e) {
+				log.debug("Couldn't create the disk icon cache directory {}; falling back to memory only", dataDirectory, e);
+			}
 		}
 
 		active = true;
@@ -556,7 +556,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		double brightness = lastKnownBrightness;
 		int supersample = config.iconQuality().getSupersample();
-		File cacheFile = iconCacheDirectory == null ? null : cacheFileFor(fingerprint);
+		Filepath cacheFile = iconCacheDirectory == null ? null : cacheFileFor(fingerprint);
 		renderExecutor.execute(() -> {
 			try {
 				if (cacheFile != null) {
@@ -589,8 +589,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		});
 	}
 
-	private File cacheFileFor(long fingerprint) {
-		return new File(iconCacheDirectory, Long.toHexString(fingerprint) + ".bin");
+	private Filepath cacheFileFor(long fingerprint) {
+		return iconCacheDirectory.join(Long.toHexString(fingerprint) + ".bin");
 	}
 
 	/**
@@ -599,10 +599,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 	 * dimensions) is treated as a cache miss rather than trusted.
 	 */
 	@Nullable
-	private int[] readCachedPixels(File file) {
+	private int[] readCachedPixels(Filepath file) {
 		if (!file.isFile())
 			return null;
-		try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
+		try (DataInputStream in = new DataInputStream(file.openInputStream())) {
 			int[] pixels = new int[PATCH_SIZE];
 			for (int i = 0; i < pixels.length; i++)
 				pixels[i] = in.readInt();
@@ -613,8 +613,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		}
 	}
 
-	private void writeCachedPixels(File file, int[] pixels) {
-		try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file))) {
+	private void writeCachedPixels(Filepath file, int[] pixels) {
+		try (DataOutputStream out = new DataOutputStream(file.openOutputStream())) {
 			for (int pixel : pixels)
 				out.writeInt(pixel);
 		} catch (IOException e) {

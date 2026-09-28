@@ -3,6 +3,7 @@ package io.mark.hditemicons;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
 @ConfigGroup(HdItemIconsConfig.GROUP)
 public interface HdItemIconsConfig extends Config {
@@ -29,5 +30,17 @@ public interface HdItemIconsConfig extends Config {
 	)
 	default IconQuality iconQuality() {
 		return IconQuality.MEDIUM;
+	}
+
+	@Range(min = 1, max = 8)
+	@ConfigItem(
+		keyName = "renderThreadCount",
+		name = "Render threads",
+		description = "How many background threads render icons at once. Higher can render icons faster"
+			+ " when many are queued at once (e.g. opening a full bank), at the cost of more CPU usage.",
+		position = 2
+	)
+	default int renderThreadCount() {
+		return 2;
 	}
 }

@@ -72,6 +72,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int INPAINT_PASSES = 3;
 	private static final float DRAGGED_OPACITY = 128 / 256f;
 	private static final float MIN_SHAPE_COVERAGE = .9f;
+	// Changed whenever icons are drawn differently, so the ones kept on disk are drawn again
+	private static final int ICON_VERSION = 2;
 
 	// We paint a small margin around the icon too, since our render can spill slightly past
 	// the game's own tighter bounding box.
@@ -96,6 +98,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		volatile boolean failed;
 		volatile boolean[] outlineRing;
 		volatile int[] pixels;
+		int[] selectedPixels;
+		boolean[] selectedOutlineRing;
 	}
 
 	/**
@@ -144,6 +148,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		private static long fingerprintOf(int itemId, int borderWidth, int quality, int[] pixels) {
 			long h = 0xCBF29CE484222325L; // FNV-1a
+			h = mix(h, ICON_VERSION);
 			h = mix(h, itemId);
 			h = mix(h, borderWidth);
 			h = mix(h, quality);
@@ -524,7 +529,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 		ReferenceIcon reference = lookupReferenceIcon(itemId, quantity, quantityMode, borderWidth, true);
 		if (reference == null || reference == UNRESOLVED)
 			return null;
-		RenderedIcon icon = iconFor(reference, itemId, quantity, borderWidth, true);
+		// Selected items use the normal icon, with the game's white border around it
+		boolean selected = borderWidth == 2;
+		ReferenceIcon normal = selected ? lookupReferenceIcon(itemId, quantity, quantityMode, 1, true) : reference;
+		if (normal == null || normal == UNRESOLVED)
+			return null;
+		RenderedIcon icon = iconFor(normal, itemId, quantity, Math.min(borderWidth, 1), true);
 		if (icon == null || icon == PENDING || icon.pixels == null)
 			return null;
 
@@ -544,7 +554,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (patchArea.isEmpty())
 			return null;
 
-		return new PlacedIcon(bounds, patchArea, reference, icon.pixels, icon.outlineRing, nextPatchBuffer());
+		if (!selected)
+			return new PlacedIcon(bounds, patchArea, reference, icon.pixels, icon.outlineRing, nextPatchBuffer());
+		if (icon.selectedPixels == null) {
+			icon.selectedPixels = ItemIconRasterizer.withSelectionBorder(icon.pixels, PATCH_WIDTH, PATCH_HEIGHT);
+			icon.selectedOutlineRing = ItemIconRasterizer.outlineRing(icon.selectedPixels, PATCH_WIDTH, PATCH_HEIGHT);
+		}
+		return new PlacedIcon(bounds, patchArea, reference, icon.selectedPixels, icon.selectedOutlineRing, nextPatchBuffer());
 	}
 
 	private int[] nextPatchBuffer() {
@@ -772,7 +788,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 						icon.failed = true;
 						return;
 					}
-					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth, palette);
+					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth > 0, palette);
 					combined = combined == null ? rendered : ItemIconRasterizer.compositeOver(rendered, combined);
 				}
 				icon.outlineRing = ItemIconRasterizer.outlineRing(combined, PATCH_WIDTH, PATCH_HEIGHT);

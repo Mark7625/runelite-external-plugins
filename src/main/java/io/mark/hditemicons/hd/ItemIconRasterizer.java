@@ -209,7 +209,7 @@ class ItemIconRasterizer {
 		centerOffsetY = -(minY + maxY) / 2;
 
 		for (int pass = 0; pass < FIT_ITERATIONS; pass++) {
-			int[] wide = renderSamples(cameraDistance, 1, 1, -ICON_WIDTH, -ICON_HEIGHT, ICON_WIDTH * 3, ICON_HEIGHT * 3, 0, palette);
+			int[] wide = renderSamples(cameraDistance, 1, 1, -ICON_WIDTH, -ICON_HEIGHT, ICON_WIDTH * 3, ICON_HEIGHT * 3, palette);
 			double[] wideCoverage = new double[wide.length];
 			for (int i = 0; i < wide.length; i++)
 				wideCoverage[i] = (wide[i] >>> 24) / 255.0;
@@ -231,7 +231,7 @@ class ItemIconRasterizer {
 				break;
 		}
 
-		int[] fitted = renderSamples(cameraDistance, 1, 1, 0, 0, ICON_WIDTH, ICON_HEIGHT, 0, palette);
+		int[] fitted = renderSamples(cameraDistance, 1, 1, 0, 0, ICON_WIDTH, ICON_HEIGHT, palette);
 		return verifiesAgainst(fitted, reference, target.coverage);
 	}
 
@@ -314,11 +314,69 @@ class ItemIconRasterizer {
 	/**
 	 * Renders the fitted camera placement into a border-margin-sized icon buffer.
 	 */
-	int[] render(int marginPixels, int outlineWidth, int[] palette) {
-		double distance = outlineWidth == 2 ? cameraDistance * 1.04 : cameraDistance;
+	int[] render(int marginPixels, boolean outlined, int[] palette) {
 		int width = ICON_WIDTH + 2 * marginPixels;
 		int height = ICON_HEIGHT + 2 * marginPixels;
-		return renderSamples(distance, 1, 1, -marginPixels, -marginPixels, width, height, outlineWidth, palette);
+		int[] pixels = renderSamples(cameraDistance, 1, 1, -marginPixels, -marginPixels, width, height, palette);
+		return outlined ? outline(pixels, width, height) : pixels;
+	}
+
+	/**
+	 * Outlines the icon the way the game does, with a solid black ring a whole pixel wide around the pixels
+	 * the model mostly covers. A smoothed outline would smear into a dark halo once the interface is stretched.
+	 */
+	private static int[] outline(int[] pixels, int width, int height) {
+		boolean[] filled = filled(pixels);
+		removeSpurs(filled, width, height);
+		boolean[] ring = ring(filled, width, height);
+		int[] outlined = new int[pixels.length];
+		for (int i = 0; i < pixels.length; i++) {
+			if (filled[i])
+				outlined[i] = over(pixels[i], 0xFF000000);
+			else if (ring[i])
+				outlined[i] = 0xFF000000;
+		}
+		return outlined;
+	}
+
+	/**
+	 * Removes single pixels sticking out of an edge: ones touching the icon on one side only, where it's
+	 * wider than them. The ends of thin lines stay.
+	 */
+	private static void removeSpurs(boolean[] filled, int width, int height) {
+		boolean[] spurs = new boolean[filled.length];
+		int[] steps = { -1, 1, -width, width };
+		for (int y = 1; y < height - 1; y++) {
+			for (int x = 1; x < width - 1; x++) {
+				int i = y * width + x;
+				if (!filled[i])
+					continue;
+				int touching = 0, towards = 0, across = 0;
+				for (int step : steps) {
+					if (filled[i + step]) {
+						touching++;
+						towards = step;
+						across = step == -1 || step == 1 ? width : 1;
+					}
+				}
+				spurs[i] = touching == 1 && filled[i + towards - across] && filled[i + towards + across];
+			}
+		}
+		for (int i = 0; i < filled.length; i++)
+			if (spurs[i])
+				filled[i] = false;
+	}
+
+	/**
+	 * The icon with the white border the game draws around selected items.
+	 */
+	static int[] withSelectionBorder(int[] pixels, int width, int height) {
+		boolean[] ring = outlineRing(pixels, width, height);
+		int[] selected = pixels.clone();
+		for (int i = 0; i < pixels.length; i++)
+			if (ring[i])
+				selected[i] = 0xFFFFFFFF;
+		return selected;
 	}
 
 	/**
@@ -352,18 +410,23 @@ class ItemIconRasterizer {
 	 */
 	static int[] compositeOver(int[] top, int[] bottom) {
 		int[] result = new int[top.length];
-		for (int i = 0; i < top.length; i++) {
-			int remaining = 255 - (top[i] >>> 24);
-			for (int shift = 0; shift < 32; shift += 8) {
-				int blended = (top[i] >>> shift & 0xFF) + ((bottom[i] >>> shift & 0xFF) * remaining + 127) / 255;
-				result[i] |= Math.min(255, blended) << shift;
-			}
+		for (int i = 0; i < top.length; i++)
+			result[i] = over(top[i], bottom[i]);
+		return result;
+	}
+
+	private static int over(int top, int bottom) {
+		int remaining = 255 - (top >>> 24);
+		int result = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			int blended = (top >>> shift & 0xFF) + ((bottom >>> shift & 0xFF) * remaining + 127) / 255;
+			result |= Math.min(255, blended) << shift;
 		}
 		return result;
 	}
 
 	private int[] renderSamples(double distance, double scaleX, double scaleY, double left, double top,
-								int width, int height, int outlineWidth, int[] palette) {
+								int width, int height, int[] palette) {
 		int vertexCount = posX.length;
 		for (int i = 0; i < vertexCount; i++) {
 			camX[i] = posX[i] + centerOffsetX;
@@ -381,8 +444,6 @@ class ItemIconRasterizer {
 		for (int face : paintOrder(screenX, screenY, camZ))
 			paintFace(face, screenX, screenY, camX, camY, camZ, rayScaleX, rayOffsetX, rayScaleY, rayOffsetY,
 				samplesWide, samplesHigh, palette, samples);
-		if (outlineWidth > 0)
-			growOutline(samples, samplesWide, samplesHigh, scaleX, scaleY, outlineWidth);
 
 		return downsample(samples, samplesWide, width, height);
 	}
@@ -603,54 +664,6 @@ class ItemIconRasterizer {
 		int opacity = 256 - transparency;
 		return ((color & 0xFF00FF) * opacity + (behind & 0xFF00FF) * transparency >> 8 & 0xFF00FF)
 			+ ((color & 0xFF00) * opacity + (behind & 0xFF00) * transparency >> 8 & 0xFF00);
-	}
-
-	/**
-	 * Grows a border of the given width around the drawn silhouette: ring 1 is near-black
-	 * (colour 1, since 0 means untouched), ring 2 (if requested) is white outside that.
-	 */
-	private void growOutline(int[] samples, int width, int height, double scaleX, double scaleY, int outlineWidth) {
-		boolean[] drawn = new boolean[samples.length];
-		for (int i = 0; i < samples.length; i++)
-			drawn[i] = samples[i] != 0;
-
-		for (int ring = 1; ring <= outlineWidth; ring++) {
-			int color = ring == 1 ? 1 : 0xFFFFFF;
-			int reachX = floorToInt(ring * scaleX * supersample);
-			int reachY = floorToInt(ring * scaleY * supersample);
-			int[] offsetsX = new int[(reachX * 2 + 1) * (reachY * 2 + 1)];
-			int[] offsetsY = new int[offsetsX.length];
-			int offsetCount = 0;
-			for (int dy = -reachY; dy <= reachY; dy++) {
-				for (int dx = -reachX; dx <= reachX; dx++) {
-					double nx = dx / (scaleX * supersample), ny = dy / (scaleY * supersample);
-					if (nx * nx + ny * ny <= (double) ring * ring) {
-						offsetsX[offsetCount] = dx;
-						offsetsY[offsetCount] = dy;
-						offsetCount++;
-					}
-				}
-			}
-
-			for (int y = 0; y < height; y++) {
-				for (int x = 0; x < width; x++) {
-					if (!drawn[y * width + x] || isFullyEnclosed(drawn, x, y, width, height))
-						continue;
-					for (int o = 0; o < offsetCount; o++) {
-						int sx = x + offsetsX[o], sy = y + offsetsY[o];
-						if (sx >= 0 && sx < width && sy >= 0 && sy < height && samples[sy * width + sx] == 0)
-							samples[sy * width + sx] = color;
-					}
-				}
-			}
-		}
-	}
-
-	private static boolean isFullyEnclosed(boolean[] drawn, int x, int y, int width, int height) {
-		return x > 0 && drawn[y * width + x - 1]
-			&& x < width - 1 && drawn[y * width + x + 1]
-			&& y > 0 && drawn[(y - 1) * width + x]
-			&& y < height - 1 && drawn[(y + 1) * width + x];
 	}
 
 	/**

@@ -21,7 +21,7 @@ import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 /**
- * Rendered icons kept on disk, in a folder per icon quality and brightness.
+ * Rendered icons kept on disk, in a folder per icon quality and brightness, and apart when custom rotations are off.
  */
 @Slf4j
 class ItemIconCache {
@@ -32,8 +32,9 @@ class ItemIconCache {
 	private final Filepath folder;
 	private final int size;
 
-	ItemIconCache(Filepath root, IconQuality quality, double brightness, int size) {
-		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness));
+	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, int size) {
+		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
+			customRotations ? "" : "-default-rotations"));
 		this.size = size;
 	}
 
@@ -100,6 +101,14 @@ class ItemIconCache {
 			temporary.moveTo(folder.joinSegment(fileName(key)), REPLACE_EXISTING, ATOMIC_MOVE);
 		} catch (IOException ex) {
 			log.debug("Unable to keep item icon {}:", fileName(key), ex);
+		}
+	}
+
+	void delete(long key) {
+		try {
+			folder.joinSegment(fileName(key)).deleteIfExists();
+		} catch (IOException ex) {
+			log.debug("Unable to delete item icon {}:", fileName(key), ex);
 		}
 	}
 

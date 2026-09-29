@@ -1,14 +1,18 @@
 package io.mark.hditemicons.hd;
 
+import io.mark.hditemicons.CustomRotation;
+import io.mark.hditemicons.CustomRotationStorage;
 import io.mark.hditemicons.HdItemIconsConfig;
 import io.mark.hditemicons.IconCacheStorage;
 import io.mark.hditemicons.IconQuality;
+import io.mark.hditemicons.ItemRenderSheet;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -20,6 +24,7 @@ import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.BufferProvider;
 import net.runelite.api.Client;
@@ -97,6 +102,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		volatile int[] pixels;
 		int[] selectedPixels;
 		boolean[] selectedOutlineRing;
+		int itemId = -1;
 	}
 
 	/**
@@ -173,14 +179,17 @@ public class HdItemIcons extends WidgetItemOverlay {
 		final int pitchJau, yawJau, rollJau;
 		final int[] referencePixels;
 		final int borderWidth;
+		@Nullable
+		final CustomRotation placement;
 
-		ModelLayer(ItemIconRasterizer.IconModel model, int pitchJau, int yawJau, int rollJau, int[] referencePixels, int borderWidth) {
+		ModelLayer(ItemIconRasterizer.IconModel model, int pitchJau, int yawJau, int rollJau, int[] referencePixels, int borderWidth, @Nullable CustomRotation placement) {
 			this.model = model;
 			this.pitchJau = pitchJau;
 			this.yawJau = yawJau;
 			this.rollJau = rollJau;
 			this.referencePixels = referencePixels;
 			this.borderWidth = borderWidth;
+			this.placement = placement;
 		}
 	}
 
@@ -317,6 +326,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private final OverlayManager overlayManager;
 	private final ClientThread clientThread;
 	private final HdItemIconsConfig config;
+	private final CustomRotationStorage rotationStorage;
+	private final ItemRenderSheet itemRenderSheet;
 	private final OverlayCapture overlayCapture = new OverlayCapture();
 	private final DraggedItemPainter draggedItemPainter = new DraggedItemPainter();
 
@@ -325,10 +336,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private double lastKnownBrightness = Double.NaN;
 	@Nullable
 	private IconQuality lastKnownQuality;
+	private boolean lastKnownCustomRotationsEnabled = true;
 	@Nullable
 	private Filepath iconCacheDirectory;
 	@Nullable
 	private ItemIconCache iconCache;
+	@Nullable
+	private volatile RotationEditorDialog openRotationDialog;
 
 	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
 		@Override
@@ -381,12 +395,15 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private double cachedPaletteBrightness;
 
 	@Inject
-	public HdItemIcons(Client client, EventBus eventBus, OverlayManager overlayManager, ClientThread clientThread, HdItemIconsConfig config) {
+	public HdItemIcons(Client client, EventBus eventBus, OverlayManager overlayManager, ClientThread clientThread,
+						HdItemIconsConfig config, CustomRotationStorage rotationStorage, ItemRenderSheet itemRenderSheet) {
 		this.client = client;
 		this.eventBus = eventBus;
 		this.overlayManager = overlayManager;
 		this.clientThread = clientThread;
 		this.config = config;
+		this.rotationStorage = rotationStorage;
+		this.itemRenderSheet = itemRenderSheet;
 		showOnInventory();
 		showOnBank();
 		showOnEquipment();
@@ -406,15 +423,16 @@ public class HdItemIcons extends WidgetItemOverlay {
 		});
 
 		iconCacheDirectory = null;
-		if (config.iconCacheStorage() == IconCacheStorage.DISK) {
-			try {
-				if (!dataDirectory.isDirectory())
-					dataDirectory.createDirectories();
+		try {
+			if (!dataDirectory.isDirectory())
+				dataDirectory.createDirectories();
+			rotationStorage.load(dataDirectory);
+			if (config.iconCacheStorage() == IconCacheStorage.DISK) {
 				iconCacheDirectory = dataDirectory;
 				renderExecutor.execute(() -> ItemIconCache.removeUnused(dataDirectory));
-			} catch (IOException e) {
-				log.debug("Couldn't create the disk icon cache directory {}; falling back to memory only", dataDirectory, e);
 			}
+		} catch (IOException e) {
+			log.debug("Couldn't create the plugin data directory {}; icon cache and custom rotations will be memory only", dataDirectory, e);
 		}
 
 		active = true;
@@ -446,6 +464,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 		overlayManager.remove(draggedItemPainter);
 		renderExecutor.shutdownNow();
 		renderExecutor = null;
+		rotationStorage.reset();
+
+		RotationEditorDialog dialog = openRotationDialog;
+		openRotationDialog = null;
+		if (dialog != null)
+			SwingUtilities.invokeLater(dialog::dispose);
 
 		iconCacheDirectory = null;
 		iconCache = null;
@@ -468,6 +492,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		cachedPaletteBrightness = 0;
 		lastKnownBrightness = Double.NaN;
 		lastKnownQuality = null;
+		lastKnownCustomRotationsEnabled = true;
 	}
 
 	@Subscribe
@@ -484,15 +509,18 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		double brightness = client.getTextureProvider().getBrightness();
 		IconQuality quality = config.iconQuality();
-		if (brightness != lastKnownBrightness || quality != lastKnownQuality) {
+		boolean customRotationsEnabled = config.customRotationsEnabled();
+		if (brightness != lastKnownBrightness || quality != lastKnownQuality
+			|| customRotationsEnabled != lastKnownCustomRotationsEnabled) {
 			// Both the game's icons and ours depend on the brightness setting, and our own
 			// renders depend on the configured supersampling quality
 			lastKnownBrightness = brightness;
 			lastKnownQuality = quality;
+			lastKnownCustomRotationsEnabled = customRotationsEnabled;
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
-			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, PATCH_SIZE);
+			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, PATCH_SIZE);
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
 		}
@@ -694,6 +722,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 				return PENDING;
 
 			icon = new RenderedIcon();
+			icon.itemId = itemId;
 			renderedIcons.put(reference.fingerprint, icon);
 			if (iconCache != null) {
 				loadIcon(icon, iconCache, reference.fingerprint);
@@ -865,8 +894,14 @@ public class HdItemIcons extends WidgetItemOverlay {
 				int[] palette = paletteFor(brightness);
 				int[] combined = null;
 				for (ModelLayer layer : layers) {
-					ItemIconRasterizer rasterizer = new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau, supersample);
-					if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette)) {
+					CustomRotation placement = layer.placement;
+					ItemIconRasterizer rasterizer = placement == null
+						? new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau, supersample)
+						: new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau,
+							placement.resizeX, placement.resizeY, placement.resizeZ, supersample);
+					if (placement != null) {
+						rasterizer.placeExplicitly(placement.zoom2d, placement.offsetX, placement.offsetY);
+					} else if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette)) {
 						icon.failed = true;
 						if (cache != null)
 							cache.save(fingerprint, null);
@@ -890,6 +925,20 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private ModelLayer buildModelLayer(int itemId, int quantity, boolean noted, int borderWidth) {
 		ItemComposition item = client.getItemDefinition(itemId);
+		ItemIconRasterizer.IconModel iconModel = captureModel(item);
+		int[] referencePixels = fetchGamePixels(itemId, quantity, 0, ItemQuantityMode.NEVER, noted);
+		if (iconModel == null || referencePixels == null)
+			return null;
+
+		CustomRotation override = config.customRotationsEnabled() ? rotationStorage.get(itemId) : null;
+		int pitch = override != null ? override.xan2d : item.getXan2d();
+		int yaw = override != null ? override.yan2d : item.getYan2d();
+		int roll = override != null ? override.zan2d : item.getZan2d();
+		return new ModelLayer(iconModel, pitch, yaw, roll, referencePixels, borderWidth, override);
+	}
+
+	@Nullable
+	private ItemIconRasterizer.IconModel captureModel(ItemComposition item) {
 		ModelData data = client.loadModelData(item.getInventoryModel());
 		if (data == null)
 			return null;
@@ -912,11 +961,89 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		// Lit the same way the game lights item models for its own icons
 		Model litModel = data.light(item.getAmbient() + 64, item.getContrast() + 768, -50, -10, -50);
-		ItemIconRasterizer.IconModel iconModel = ItemIconRasterizer.IconModel.capture(litModel, client.getTextureProvider());
-		int[] referencePixels = fetchGamePixels(itemId, quantity, 0, ItemQuantityMode.NEVER, noted);
-		if (iconModel == null || referencePixels == null)
-			return null;
-		return new ModelLayer(iconModel, item.getXan2d(), item.getYan2d(), item.getZan2d(), referencePixels, borderWidth);
+		return ItemIconRasterizer.IconModel.capture(litModel, client.getTextureProvider());
+	}
+
+	/** Called from the menu entry's click handler, which already runs on the client thread. */
+	public void openRotationEditor(int itemId) {
+		if (!active || Double.isNaN(lastKnownBrightness))
+			return;
+
+		ItemComposition item = client.getItemDefinition(itemId);
+		ItemIconRasterizer.IconModel iconModel = captureModel(item);
+		if (iconModel == null)
+			return;
+
+		int[] palette = paletteFor(lastKnownBrightness);
+		int supersample = config.iconQuality().getSupersample();
+
+		ItemRenderSheet.Placement sheetDefault = itemRenderSheet.get(itemId);
+		CustomRotation defaults = new CustomRotation(item.getXan2d(), item.getYan2d(), item.getZan2d(),
+			sheetDefault.zoom2d, sheetDefault.offsetX, sheetDefault.offsetY,
+			sheetDefault.resizeX, sheetDefault.resizeY, sheetDefault.resizeZ);
+		CustomRotation existing = rotationStorage.get(itemId);
+		CustomRotation initial = existing != null ? existing : defaults;
+		String name = item.getName();
+
+		SwingUtilities.invokeLater(() -> {
+			if (!active)
+				return;
+			RotationEditorDialog dialog = new RotationEditorDialog(name, itemId, initial, defaults,
+				iconModel, palette, supersample, rotationStorage, this::onRotationChanged);
+			openRotationDialog = dialog;
+			dialog.setVisible(true);
+		});
+	}
+
+	private void onRotationChanged(int itemId) {
+		clientThread.invoke(() -> clearRenderCache(itemId));
+	}
+
+	/** The cache is keyed by the game's own icon, which a saved rotation doesn't change. */
+	public void clearRenderCache(int itemId) {
+		clearRenderCache(Set.of(itemId));
+	}
+
+	public void clearRenderCache(Collection<Integer> itemIds) {
+		if (itemIds.isEmpty())
+			return;
+
+		Set<Integer> targets = Set.copyOf(itemIds);
+		List<Long> cleared = new ArrayList<>();
+		renderedIcons.replaceAll((fingerprint, icon) -> {
+			if (!targets.contains(icon.itemId))
+				return icon;
+			cleared.add(fingerprint);
+			return renderAgain(icon);
+		});
+		deleteCachedImages(cleared);
+	}
+
+	public void clearRenderCache() {
+		List<Long> cleared = new ArrayList<>(renderedIcons.keySet());
+		renderedIcons.replaceAll((fingerprint, icon) -> renderAgain(icon));
+		settledContainers.clear();
+		deleteCachedImages(cleared);
+	}
+
+	// Not loaded from disk, where the old icon may not be deleted yet
+	private static RenderedIcon renderAgain(RenderedIcon icon) {
+		RenderedIcon fresh = new RenderedIcon();
+		fresh.itemId = icon.itemId;
+		fresh.uncached = true;
+		return fresh;
+	}
+
+	private void deleteCachedImages(List<Long> fingerprints) {
+		ItemIconCache cache = iconCache;
+		ExecutorService executor = renderExecutor;
+		if (cache == null || executor == null || fingerprints.isEmpty())
+			return;
+
+		executor.execute(() -> {
+			for (long fingerprint : fingerprints)
+				cache.delete(fingerprint);
+		});
 	}
 
 	private synchronized int[] paletteFor(double brightness) {

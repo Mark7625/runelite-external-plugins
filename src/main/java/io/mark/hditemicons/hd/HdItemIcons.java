@@ -676,7 +676,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		for (int y = patchArea.y; y < patchArea.y + patchArea.height; y++) {
 			for (int x = patchArea.x; x < patchArea.x + patchArea.width; x++) {
 				int patch = patchIndex(x - iconBounds.x, y - iconBounds.y);
-				patchColor[patch] = framePixels[y * frameWidth + x] & 0xFFFFFF;
+				patchColor[patch] = framePixels[y * frameWidth + x];
 				patchResolved[patch] = !reference.has(patch, FLAG_ITEM) && !reference.has(patch, FLAG_STACK_TEXT);
 			}
 		}
@@ -729,7 +729,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 				if (patchResolved[patch])
 					continue;
 
-				int count = 0, r = 0, g = 0, b = 0;
+				int count = 0, a = 0, r = 0, g = 0, b = 0;
 				for (int n = 0; n < NEIGHBOR_DX.length; n++) {
 					int nx = x + NEIGHBOR_DX[n];
 					int ny = y + NEIGHBOR_DY[n];
@@ -739,13 +739,14 @@ public class HdItemIcons extends WidgetItemOverlay {
 					if (!patchResolved[neighborPatch])
 						continue;
 					int neighborColor = patchColor[neighborPatch];
+					a += neighborColor >>> 24;
 					r += neighborColor >> 16 & 0xFF;
 					g += neighborColor >> 8 & 0xFF;
 					b += neighborColor & 0xFF;
 					count++;
 				}
 				if (count > 0) {
-					patchColor[patch] = (r / count) << 16 | (g / count) << 8 | (b / count);
+					patchColor[patch] = (a / count) << 24 | (r / count) << 16 | (g / count) << 8 | (b / count);
 					patchResolvedScratch[patch] = true;
 					resolvedAny = true;
 				}
@@ -766,40 +767,25 @@ public class HdItemIcons extends WidgetItemOverlay {
 					continue;
 
 				int iconArgb = iconPixels[patch];
-				float shade = 0;
-				if (shadowColor != 0 && localX - 1 >= -MARGIN && localY - 1 >= -MARGIN)
-					shade = (iconPixels[patchIndex(localX - 1, localY - 1)] >>> 24) / 255f;
-
-				// Pixels the old icon (or its shadow) never touched, and that our own icon
-				// doesn't draw into either, are untouched slot background - leave them and their
-				// real alpha alone. Transparent side panels rely on that alpha channel (the GPU
-				// compositor blends the interface over the 3D scene with it); stamping every
-				// patch pixel fully opaque, as this used to unconditionally do, punches a solid
-				// opaque square into an otherwise translucent panel.
-				boolean erasingOldIcon = reference.has(patch, FLAG_ITEM) || reference.has(patch, FLAG_SHADOW);
-				if (!erasingOldIcon && (iconArgb >>> 24) == 0 && shade == 0)
-					continue;
-
-				float iconAlpha = (iconArgb >>> 24) / 255f * opacity;
-				int r = patchColor[patch] >> 16 & 0xFF;
-				int g = patchColor[patch] >> 8 & 0xFF;
-				int b = patchColor[patch] & 0xFF;
-
-				if (shade > 0) {
-					r = Math.round((shadowColor >> 16 & 0xFF) * shade + r * (1 - shade));
-					g = Math.round((shadowColor >> 8 & 0xFF) * shade + g * (1 - shade));
-					b = Math.round((shadowColor & 0xFF) * shade + b * (1 - shade));
+				int background = patchColor[patch];
+				if (shadowColor != 0 && localX - 1 >= -MARGIN && localY - 1 >= -MARGIN) {
+					float shade = (iconPixels[patchIndex(localX - 1, localY - 1)] >>> 24) / 255f;
+					background = blend(shadowColor, shade, background, 1 - shade);
 				}
 
-				r = clamp8(Math.round((iconArgb >> 16 & 0xFF) * opacity + r * (1 - iconAlpha)));
-				g = clamp8(Math.round((iconArgb >> 8 & 0xFF) * opacity + g * (1 - iconAlpha)));
-				b = clamp8(Math.round((iconArgb & 0xFF) * opacity + b * (1 - iconAlpha)));
-				framePixels[y * frameWidth + x] = 0xFF000000 | r << 16 | g << 8 | b;
+				// With GPU the interface is premultiplied ARGB, so alpha is blended like the colours
+				float iconAlpha = (iconArgb >>> 24) / 255f * opacity;
+				framePixels[y * frameWidth + x] = blend(iconArgb, opacity, background, 1 - iconAlpha);
 			}
 		}
 	}
 
-	private static int clamp8(int v) {
-		return v < 0 ? 0 : Math.min(255, v);
+	private static int blend(int top, float topWeight, int bottom, float bottomWeight) {
+		int result = 0;
+		for (int shift = 0; shift < 32; shift += 8) {
+			int channel = Math.round((top >>> shift & 0xFF) * topWeight + (bottom >>> shift & 0xFF) * bottomWeight);
+			result |= Math.min(255, channel) << shift;
+		}
+		return result;
 	}
 }

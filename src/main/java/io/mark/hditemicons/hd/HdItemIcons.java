@@ -192,18 +192,57 @@ public class HdItemIcons extends WidgetItemOverlay {
 		final ReferenceIcon reference;
 		final int[] pixels;
 		final boolean[] outlineRing;
+		@Nullable
+		final Slot slot;
 		final int[] composed;
 		int[] background;
 		int[] overlays;
-		int fill, outline;
 
-		PlacedIcon(Rectangle bounds, Rectangle patchArea, ReferenceIcon reference, int[] pixels, boolean[] outlineRing, int[] composed) {
+		PlacedIcon(Rectangle bounds, Rectangle patchArea, ReferenceIcon reference, int[] pixels, boolean[] outlineRing,
+			@Nullable Slot slot, int[] composed) {
 			this.bounds = bounds;
 			this.patchArea = patchArea;
 			this.reference = reference;
 			this.pixels = pixels;
 			this.outlineRing = outlineRing;
+			this.slot = slot;
 			this.composed = composed;
+		}
+	}
+
+	/**
+	 * What's behind an item and what other overlays draw over it rarely change, so they're only worked
+	 * out again when they do.
+	 */
+	private static final class Slot {
+		final int[] behind = new int[PATCH_SIZE];
+		final int[] cut = new int[PATCH_SIZE];
+		final int[] composed = new int[PATCH_SIZE];
+		final int[] overlays = new int[PATCH_SIZE];
+		final int[] drawn = new int[PATCH_SIZE];
+		ReferenceIcon reference;
+		int[] pixels;
+		Rectangle patchArea;
+		float opacity;
+		boolean overlaid;
+		int lastUsed;
+
+		boolean holds(PlacedIcon placed, float opacity) {
+			return reference == placed.reference && pixels == placed.pixels && placed.patchArea.equals(patchArea) && this.opacity == opacity;
+		}
+
+		void keep(PlacedIcon placed, float opacity) {
+			reference = placed.reference;
+			pixels = placed.pixels;
+			patchArea = placed.patchArea;
+			this.opacity = opacity;
+			overlaid = false;
+			for (int y = patchArea.y; y < patchArea.y + patchArea.height; y++) {
+				for (int x = patchArea.x; x < patchArea.x + patchArea.width; x++) {
+					int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+					cut[patch] = reference.has(patch, FLAG_STACK_TEXT) ? behind[patch] : 0;
+				}
+			}
 		}
 	}
 
@@ -325,7 +364,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private final Set<Integer> hookedInterfaces = new HashSet<>();
 
 	private int rendersStartedThisFrame;
+	private int frameCount;
 	private final Set<Rectangle> paintedThisFrame = new HashSet<>();
+	private final Map<Rectangle, Slot> slots = new HashMap<>();
 	private final List<WidgetItem> draggedItems = new ArrayList<>();
 	private final List<PlacedIcon> draggedIcons = new ArrayList<>();
 	private final List<PlacedIcon> cutItems = new ArrayList<>();
@@ -416,6 +457,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		settledContainers.clear();
 		hookedInterfaces.clear();
 		paintedThisFrame.clear();
+		slots.clear();
 		draggedItems.clear();
 		draggedIcons.clear();
 		cutItems.clear();
@@ -430,6 +472,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	@Subscribe
 	public void onBeforeRender(BeforeRender event) {
+		frameCount++;
+		slots.values().removeIf(slot -> slot.lastUsed < frameCount - 1);
 		rendersStartedThisFrame = 0;
 		paintedThisFrame.clear();
 		draggedItems.clear();
@@ -506,8 +550,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 		BufferProvider frame = client.getBufferProvider();
 		int[] framePixels = frame.getPixels();
 		float opacity = (256 - widgetItem.getWidget().getOpacity()) / 256f;
-		int shadowColor = inpaintBackground(framePixels, frame.getWidth(), placed.bounds, placed.patchArea, placed.reference);
-		composeIcon(placed, shadowColor, opacity);
+		Slot slot = placed.slot;
+		if (!slot.holds(placed, opacity) || !samePixels(framePixels, frame.getWidth(), placed, slot.behind)) {
+			readPatch(framePixels, frame.getWidth(), placed, slot.behind);
+			int shadowColor = inpaintBackground(framePixels, frame.getWidth(), placed.bounds, placed.patchArea, placed.reference);
+			composeIcon(placed, shadowColor, opacity);
+			slot.keep(placed, opacity);
+		}
 		if (client.isGpu()) {
 			// Other overlays draw onto a transparent patch, so the ones that follow the game's icon can be fitted to ours
 			writePatch(framePixels, frame.getWidth(), placed, EMPTY_PATCH);
@@ -559,13 +608,23 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (patchArea.isEmpty())
 			return null;
 
-		if (!selected)
-			return new PlacedIcon(bounds, patchArea, reference, icon.pixels, icon.outlineRing, nextPatchBuffer());
-		if (icon.selectedPixels == null) {
-			icon.selectedPixels = ItemIconRasterizer.withSelectionBorder(icon.pixels, PATCH_WIDTH, PATCH_HEIGHT);
-			icon.selectedOutlineRing = ItemIconRasterizer.outlineRing(icon.selectedPixels, PATCH_WIDTH, PATCH_HEIGHT);
+		int[] pixels = icon.pixels;
+		boolean[] outlineRing = icon.outlineRing;
+		if (selected) {
+			if (icon.selectedPixels == null) {
+				icon.selectedPixels = ItemIconRasterizer.withSelectionBorder(icon.pixels, PATCH_WIDTH, PATCH_HEIGHT);
+				icon.selectedOutlineRing = ItemIconRasterizer.outlineRing(icon.selectedPixels, PATCH_WIDTH, PATCH_HEIGHT);
+			}
+			pixels = icon.selectedPixels;
+			outlineRing = icon.selectedOutlineRing;
 		}
-		return new PlacedIcon(bounds, patchArea, reference, icon.selectedPixels, icon.selectedOutlineRing, nextPatchBuffer());
+
+		// Dragged items move, so they're worked out every frame
+		if (widget == client.getDraggedWidget())
+			return new PlacedIcon(bounds, patchArea, reference, pixels, outlineRing, null, nextPatchBuffer());
+		Slot slot = slots.computeIfAbsent(bounds, b -> new Slot());
+		slot.lastUsed = frameCount;
+		return new PlacedIcon(bounds, patchArea, reference, pixels, outlineRing, slot, slot.composed);
 	}
 
 	private int[] nextPatchBuffer() {
@@ -601,10 +660,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 			int shadowColor = draggedShadowColor(framePixels, frame.getWidth(), dragged);
 			System.arraycopy(dragged.background, 0, patchColor, 0, PATCH_SIZE);
 			composeIcon(dragged, shadowColor, DRAGGED_OPACITY);
-			if (dragged.overlays != null)
-				drawWithOverlays(framePixels, frame.getWidth(), dragged);
-			else
-				writePatch(framePixels, frame.getWidth(), dragged, dragged.composed);
+			drawWithOverlays(framePixels, frame.getWidth(), dragged);
 		}
 		draggedIcons.clear();
 	}
@@ -993,6 +1049,25 @@ public class HdItemIcons extends WidgetItemOverlay {
 		}
 	}
 
+	private static boolean samePixels(int[] framePixels, int frameWidth, PlacedIcon placed, int[] patchPixels) {
+		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
+			int i = y * frameWidth + placed.patchArea.x;
+			int patch = patchIndex(placed.patchArea.x - placed.bounds.x, y - placed.bounds.y);
+			if (!Arrays.equals(framePixels, i, i + placed.patchArea.width, patchPixels, patch, patch + placed.patchArea.width))
+				return false;
+		}
+		return true;
+	}
+
+	private static boolean samePatch(PlacedIcon placed, int[] a, int[] b) {
+		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
+			int patch = patchIndex(placed.patchArea.x - placed.bounds.x, y - placed.bounds.y);
+			if (!Arrays.equals(a, patch, patch + placed.patchArea.width, b, patch, patch + placed.patchArea.width))
+				return false;
+		}
+		return true;
+	}
+
 	private static void readPatch(int[] framePixels, int frameWidth, PlacedIcon placed, int[] patchPixels) {
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++)
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++)
@@ -1000,23 +1075,40 @@ public class HdItemIcons extends WidgetItemOverlay {
 	}
 
 	private void captureOverlays(int[] framePixels, int frameWidth, PlacedIcon placed) {
+		// Nothing was drawn over the item while its pixels are still as they were cut out
+		if (placed.slot != null && samePixels(framePixels, frameWidth, placed, placed.slot.cut)) {
+			placed.overlays = null;
+			return;
+		}
 		placed.overlays = nextPatchBuffer();
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
 				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				if (!placed.reference.has(patch, FLAG_STACK_TEXT)) {
+				if (placed.reference.has(patch, FLAG_STACK_TEXT)) {
+					placed.overlays[patch] = 0;
+				} else {
 					placed.overlays[patch] = framePixels[y * frameWidth + x];
 					framePixels[y * frameWidth + x] = 0;
 				}
 			}
 		}
-		placed.fill = shapeColor(placed, FLAG_ITEM);
-		placed.outline = shapeColor(placed, FLAG_OUTLINE);
 	}
 
-	private static void drawWithOverlays(int[] framePixels, int frameWidth, PlacedIcon placed) {
+	private void drawWithOverlays(int[] framePixels, int frameWidth, PlacedIcon placed) {
+		Slot slot = placed.slot;
+		if (placed.overlays == null) {
+			writePatch(framePixels, frameWidth, placed, placed.composed);
+			return;
+		}
+		if (slot != null && slot.overlaid && samePatch(placed, placed.overlays, slot.overlays)) {
+			writePatch(framePixels, frameWidth, placed, slot.drawn);
+			return;
+		}
+
 		ReferenceIcon reference = placed.reference;
-		int fill = placed.fill, outline = placed.outline;
+		int fill = shapeColor(placed, FLAG_ITEM);
+		int outline = shapeColor(placed, FLAG_OUTLINE);
+		int[] drawn = slot != null ? slot.drawn : nextPatchBuffer();
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
 				int localX = x - placed.bounds.x;
@@ -1036,9 +1128,14 @@ public class HdItemIcons extends WidgetItemOverlay {
 				float shadow = localX - 1 >= -MARGIN && localY - 1 >= -MARGIN ? alpha(placed.pixels[patchIndex(localX - 1, localY - 1)]) : 0;
 				float outlined = placed.outlineRing[patch] ? 1 - item : 0;
 				int fitted = over(scale(fill, Math.max(item, shadow)), scale(outline, outlined));
-				framePixels[y * frameWidth + x] = over(over(overlay, fitted), placed.composed[patch]);
+				drawn[patch] = over(over(overlay, fitted), placed.composed[patch]);
 			}
 		}
+		if (slot != null) {
+			System.arraycopy(placed.overlays, 0, slot.overlays, 0, PATCH_SIZE);
+			slot.overlaid = true;
+		}
+		writePatch(framePixels, frameWidth, placed, drawn);
 	}
 
 	private static int shapeColor(PlacedIcon placed, byte shape) {

@@ -771,8 +771,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private ReferenceIcon lookupReferenceIcon(int itemId, int quantity, int quantityMode, int borderWidth, boolean visibleNow) {
 		long key = (long) quantity << 24 | (long) itemId << 4 | (long) quantityMode << 2 | borderWidth;
-		if (referenceIcons.containsKey(key))
-			return referenceIcons.get(key);
+		ReferenceIcon cached = referenceIcons.get(key);
+		if (cached != null || referenceIcons.containsKey(key))
+			return cached;
 		if (!consumeRenderBudget(visibleNow))
 			return UNRESOLVED;
 

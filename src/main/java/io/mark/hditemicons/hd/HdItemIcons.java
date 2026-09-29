@@ -33,10 +33,9 @@ import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
-import net.runelite.api.WidgetNode;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
@@ -91,6 +90,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	private static final int[] NEIGHBOR_DX = {-1, 1, 0, 0};
 	private static final int[] NEIGHBOR_DY = {0, 0, -1, 1};
+
+	private static final int[] INVENTORY_LIKE_INTERFACES = {
+		InterfaceID.INVENTORY, InterfaceID.WORNITEMS, InterfaceID.EQUIPMENT_SIDE,
+		InterfaceID.BANKSIDE, InterfaceID.SHARED_BANK_SIDE, InterfaceID.BANK_DEPOSITBOX,
+		InterfaceID.SHOPSIDE,
+	};
 
 	/**
 	 * A queued or finished render. A shared {@link #PENDING} instance stands in for "still
@@ -263,15 +268,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 	 */
 	private final class OverlayCapture extends WidgetItemOverlay {
 		OverlayCapture() {
-			showOnInventory();
-			showOnBank();
-			showOnEquipment();
+			for (int groupId : INVENTORY_LIKE_INTERFACES)
+				drawAfterInterface(groupId);
+			drawAfterLayer(InterfaceID.Bankmain.ITEMS);
+			drawAfterLayer(InterfaceID.SharedBank.ITEMS);
 			// After the other item overlays
 			setPriority(PRIORITY_HIGHEST + 1);
-		}
-
-		void showOnInterface(int groupId) {
-			drawAfterInterface(groupId);
 		}
 
 		@Override
@@ -379,7 +381,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 	// so the prefetch pass can skip re-scanning them every frame - this matters a lot for the
 	// bank, which can hold 800+ slots.
 	private final Set<Integer> settledContainers = new HashSet<>();
-	private final Set<Integer> hookedInterfaces = new HashSet<>();
 
 	private int rendersStartedThisFrame;
 	private int frameCount;
@@ -408,9 +409,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 		this.config = config;
 		this.rotationStorage = rotationStorage;
 		this.itemRenderSheet = itemRenderSheet;
-		showOnInventory();
-		showOnBank();
-		showOnEquipment();
+		for (int groupId : INVENTORY_LIKE_INTERFACES)
+			drawAfterInterface(groupId);
+		drawAfterLayer(InterfaceID.Bankmain.ITEMS);
+		drawAfterLayer(InterfaceID.SharedBank.ITEMS);
 		// Ahead of other item overlays, so they draw on top of our replacement icon
 		setPriority(PRIORITY_LOW - 1);
 	}
@@ -449,9 +451,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 			// with no way left to remove it.
 			if (!active)
 				return;
-			hookInterface(client.getTopLevelInterfaceId());
-			for (WidgetNode node : client.getComponentTable())
-				hookInterface(node.getId());
 			overlayManager.add(this);
 			overlayManager.add(overlayCapture);
 			overlayManager.add(draggedItemPainter);
@@ -491,7 +490,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 		stackModelSearchProgress.clear();
 		watchedContainers.clear();
 		settledContainers.clear();
-		hookedInterfaces.clear();
 		paintedThisFrame.clear();
 		slots.clear();
 		draggedItems.clear();
@@ -549,28 +547,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 	}
 
 	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event) {
-		if (hookInterface(event.getGroupId())) {
-			// Re-add so the overlay manager notices the new draw hook
-			overlayManager.remove(this);
-			overlayManager.remove(overlayCapture);
-			overlayManager.add(this);
-			overlayManager.add(overlayCapture);
-		}
-	}
-
-	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
 		watchedContainers.put(event.getContainerId(), event.getItemContainer().getItems());
 		settledContainers.remove(event.getContainerId());
-	}
-
-	private boolean hookInterface(int groupId) {
-		if (groupId == -1 || !hookedInterfaces.add(groupId))
-			return false;
-		drawAfterInterface(groupId);
-		overlayCapture.showOnInterface(groupId);
-		return true;
 	}
 
 	@Override

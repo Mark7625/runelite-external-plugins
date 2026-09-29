@@ -371,7 +371,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		}
 	};
 	private final Map<Integer, Item[]> watchedContainers = new HashMap<>();
-	// Containers whose items have all already been queued for a render (or found ineligible),
+	// Containers whose items all have their icons ready (or found ineligible),
 	// so the prefetch pass can skip re-scanning them every frame - this matters a lot for the
 	// bank, which can hold 800+ slots.
 	private final Set<Integer> settledContainers = new HashSet<>();
@@ -786,14 +786,15 @@ public class HdItemIcons extends WidgetItemOverlay {
 			for (Item item : entry.getValue()) {
 				if (renderedIcons.size() >= MAX_CACHED_ICONS)
 					return;
-				if (item.getId() != -1 && resolveIcon(item.getId(), item.getQuantity(), ItemQuantityMode.NEVER, 1, false) == PENDING) {
-					settled = false;
-					break;
-				}
+				if (item.getId() == -1)
+					continue;
+				RenderedIcon icon = resolveIcon(item.getId(), item.getQuantity(), ItemQuantityMode.NEVER, 1, false);
+				if (icon == PENDING)
+					return;
+				settled &= icon == null || icon.pixels != null;
 			}
-			if (!settled)
-				return;
-			settledContainers.add(containerId);
+			if (settled)
+				settledContainers.add(containerId);
 		}
 	}
 

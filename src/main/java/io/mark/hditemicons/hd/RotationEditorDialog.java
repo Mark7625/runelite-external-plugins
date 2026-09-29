@@ -350,7 +350,8 @@ final class RotationEditorDialog extends JFrame {
 			ItemIconRasterizer rasterizer = new ItemIconRasterizer(model, rotation.xan2d, rotation.yan2d, rotation.zan2d,
 				rotation.resizeX, rotation.resizeY, rotation.resizeZ, supersample);
 			rasterizer.placeExplicitly(rotation.zoom2d, rotation.offsetX, rotation.offsetY);
-			int[] pixels = rasterizer.render(0, false, palette);
+			// Unsharpened: this preview is magnified, not stretched by the interface
+			int[] pixels = rasterizer.render(0, false, false, palette);
 			SwingUtilities.invokeLater(() -> {
 				if (generation != previewGeneration)
 					return;

@@ -21,6 +21,11 @@ class ItemIconRasterizer {
 	private static final int PROJECTION_ORIGIN = 16;
 	private static final int FIT_ITERATIONS = 10;
 	private static final double FIT_TOLERANCE = 0.001;
+	// Roughly what a 1.5x bilinear stretch costs in edge contrast
+	private static final int SHARPEN_PERCENT = 50;
+	private static final int[] NEIGHBOR_X = { -1, 1, 0, 0 };
+	private static final int[] NEIGHBOR_Y = { 0, 0, -1, 1 };
+
 	private static final int MAX_MISMATCHED_PIXELS = 3;
 	private static final double MAX_MISMATCHED_FRACTION = 0.1;
 	private static final int MAX_CHANNEL_ERROR = 32;
@@ -345,19 +350,67 @@ class ItemIconRasterizer {
 	/**
 	 * Renders the fitted camera placement into a border-margin-sized icon buffer.
 	 */
-	int[] render(int marginPixels, boolean outlined, int[] palette) {
+	int[] render(int marginPixels, boolean outlined, boolean sharpen, int[] palette) {
 		int width = ICON_WIDTH + 2 * marginPixels;
 		int height = ICON_HEIGHT + 2 * marginPixels;
 		int[] pixels = renderSamples(cameraDistance, 1, 1, -marginPixels, -marginPixels, width, height, palette);
-		return outlined ? outline(pixels, width, height) : pixels;
+		int[] shaded = sharpen ? sharpen(pixels, width, height) : pixels;
+		// Outlined off the unsharpened pixels: sharpening nudges alpha across the threshold
+		// filled() tests, which would otherwise reshape the ring depending on the setting
+		return outlined ? outline(pixels, shaded, width, height) : shaded;
+	}
+
+	/**
+	 * Pre-compensates for the interface being stretched: the icon is about to be scaled up and
+	 * blurred by a filter we don't control, so it's sharpened by roughly what that will cost. Only
+	 * worth doing when the icon really is stretched - at 1:1 it would just look over-sharpened.
+	 */
+	private static int[] sharpen(int[] pixels, int width, int height) {
+		int[] sharpened = new int[pixels.length];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int neighbours = 0, blurA = 0, blurR = 0, blurG = 0, blurB = 0;
+				for (int n = 0; n < NEIGHBOR_X.length; n++) {
+					int nx = x + NEIGHBOR_X[n], ny = y + NEIGHBOR_Y[n];
+					if (nx < 0 || nx >= width || ny < 0 || ny >= height)
+						continue;
+					int neighbour = pixels[ny * width + nx];
+					blurA += neighbour >>> 24;
+					blurR += neighbour >> 16 & 0xFF;
+					blurG += neighbour >> 8 & 0xFF;
+					blurB += neighbour & 0xFF;
+					neighbours++;
+				}
+
+				int i = y * width + x;
+				int pixel = pixels[i];
+				if (neighbours == 0) {
+					sharpened[i] = pixel;
+					continue;
+				}
+
+				int alpha = unsharp(pixel >>> 24, blurA / neighbours, 255);
+				// Colour is premultiplied, so a channel above its own alpha would composite as a
+				// bright fringe rather than a brighter pixel
+				sharpened[i] = alpha << 24
+					| unsharp(pixel >> 16 & 0xFF, blurR / neighbours, alpha) << 16
+					| unsharp(pixel >> 8 & 0xFF, blurG / neighbours, alpha) << 8
+					| unsharp(pixel & 0xFF, blurB / neighbours, alpha);
+			}
+		}
+		return sharpened;
+	}
+
+	private static int unsharp(int value, int blurred, int max) {
+		return clampInt(value + (value - blurred) * SHARPEN_PERCENT / 100, 0, max);
 	}
 
 	/**
 	 * Outlines the icon the way the game does, with a solid black ring a whole pixel wide around the pixels
 	 * the model mostly covers. A smoothed outline would smear into a dark halo once the interface is stretched.
 	 */
-	private static int[] outline(int[] pixels, int width, int height) {
-		boolean[] filled = filled(pixels);
+	private static int[] outline(int[] shape, int[] pixels, int width, int height) {
+		boolean[] filled = filled(shape);
 		removeSpurs(filled, width, height);
 		boolean[] ring = ring(filled, width, height);
 		int[] outlined = new int[pixels.length];

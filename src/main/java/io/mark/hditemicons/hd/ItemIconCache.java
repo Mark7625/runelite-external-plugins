@@ -21,7 +21,8 @@ import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 /**
- * Rendered icons kept on disk, in a folder per icon quality and brightness, and apart when custom rotations are off.
+ * Rendered icons kept on disk, in a folder per icon quality and brightness, and apart when custom rotations are off or
+ * the interface is stretched.
  */
 @Slf4j
 class ItemIconCache {
@@ -32,9 +33,9 @@ class ItemIconCache {
 	private final Filepath folder;
 	private final int size;
 
-	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, int size) {
-		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
-			customRotations ? "" : "-default-rotations"));
+	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, boolean stretched, int size) {
+		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
+			customRotations ? "" : "-default-rotations", stretched ? "-stretched" : ""));
 		this.size = size;
 	}
 

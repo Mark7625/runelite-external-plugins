@@ -72,7 +72,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
-	private static final int INPAINT_PASSES = 3;
 	private static final float DRAGGED_OPACITY = 128 / 256f;
 	private static final float MIN_SHAPE_COVERAGE = .9f;
 
@@ -81,6 +80,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MARGIN = 2;
 	private static final int PATCH_WIDTH = ICON_WIDTH + 2 * MARGIN;
 	private static final int PATCH_HEIGHT = ICON_HEIGHT + 2 * MARGIN;
+	// A pass spreads one pixel, so this is the most it can take to cross the patch
+	private static final int INPAINT_PASSES = PATCH_WIDTH + PATCH_HEIGHT;
 	private static final int PATCH_SIZE = PATCH_WIDTH * PATCH_HEIGHT;
 
 	private static final byte FLAG_ITEM = 0x1;
@@ -337,6 +338,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private IconQuality lastKnownQuality;
 	private boolean lastKnownCustomRotationsEnabled = true;
+	private boolean lastKnownStretched;
+	private int hiddenDraggedItem = -1;
+	private int hiddenDraggedItemModel;
 	@Nullable
 	private Filepath iconCacheDirectory;
 	@Nullable
@@ -458,6 +462,14 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (!active)
 			return;
 		active = false;
+		// Before anything else: an emptied model left behind would follow the item around the
+		// client long after the plugin stopped
+		if (hiddenDraggedItem != -1) {
+			client.getItemDefinition(hiddenDraggedItem).setInventoryModel(hiddenDraggedItemModel);
+			hiddenDraggedItem = -1;
+			client.getItemModelCache().reset();
+			client.getItemSpriteCache().reset();
+		}
 		eventBus.unregister(this);
 		overlayManager.remove(this);
 		overlayManager.remove(overlayCapture);
@@ -493,10 +505,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 		lastKnownBrightness = Double.NaN;
 		lastKnownQuality = null;
 		lastKnownCustomRotationsEnabled = true;
+		lastKnownStretched = false;
 	}
 
 	@Subscribe
 	public void onBeforeRender(BeforeRender event) {
+		hideDraggedItem();
 		frameCount++;
 		slots.values().removeIf(slot -> slot.lastUsed < frameCount - 1);
 		rendersStartedThisFrame = 0;
@@ -510,17 +524,22 @@ public class HdItemIcons extends WidgetItemOverlay {
 		double brightness = client.getTextureProvider().getBrightness();
 		IconQuality quality = config.iconQuality();
 		boolean customRotationsEnabled = config.customRotationsEnabled();
+		// Icons are sharpened only when the interface is stretched, so they can't be shared
+		// between the two - a sharpened icon drawn at 1:1 looks over-sharpened
+		boolean stretched = client.isStretchedEnabled();
 		if (brightness != lastKnownBrightness || quality != lastKnownQuality
-			|| customRotationsEnabled != lastKnownCustomRotationsEnabled) {
+			|| customRotationsEnabled != lastKnownCustomRotationsEnabled
+			|| stretched != lastKnownStretched) {
 			// Both the game's icons and ours depend on the brightness setting, and our own
 			// renders depend on the configured supersampling quality
 			lastKnownBrightness = brightness;
 			lastKnownQuality = quality;
 			lastKnownCustomRotationsEnabled = customRotationsEnabled;
+			lastKnownStretched = stretched;
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
-			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, PATCH_SIZE);
+			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, PATCH_SIZE);
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
 		}
@@ -595,6 +614,39 @@ public class HdItemIcons extends WidgetItemOverlay {
 	}
 
 	@Nullable
+	/**
+	 * The client overrides a widget's opacity for the item being dragged and draws the game's icon
+	 * anyway, so the only way to keep it from showing through a custom rotation is to leave it
+	 * nothing to draw: its model is emptied for as long as the drag lasts, and put back after.
+	 * Only worth it for a custom rotation, since otherwise our icon covers the game's own shape.
+	 */
+	private void hideDraggedItem() {
+		Widget dragged = client.getDraggedWidget();
+		int itemId = dragged == null ? -1 : dragged.getItemId();
+		if (itemId != -1 && (!config.hideDraggedItemIcon() || !config.customRotationsEnabled()
+			|| rotationStorage.get(itemId) == null))
+			itemId = -1;
+		// Emptying the model empties the game icon we measure ours against too, so this waits
+		// until that's cached rather than caching an empty one in its place
+		if (itemId != -1 && lookupReferenceIcon(itemId, dragged.getItemQuantity(), dragged.getItemQuantityMode(),
+			dragged.getBorderType(), true) == UNRESOLVED)
+			return;
+		if (itemId == hiddenDraggedItem)
+			return;
+
+		if (hiddenDraggedItem != -1)
+			client.getItemDefinition(hiddenDraggedItem).setInventoryModel(hiddenDraggedItemModel);
+		if (itemId != -1) {
+			ItemComposition item = client.getItemDefinition(itemId);
+			hiddenDraggedItemModel = item.getInventoryModel();
+			item.setInventoryModel(-1);
+		}
+		hiddenDraggedItem = itemId;
+		// Not the composition cache, which would reload the model straight back over ours
+		client.getItemModelCache().reset();
+		client.getItemSpriteCache().reset();
+	}
+
 	private PlacedIcon place(WidgetItem widgetItem) {
 		Widget widget = widgetItem.getWidget();
 		Rectangle bounds = widgetItem.getCanvasBounds();
@@ -889,6 +941,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		double brightness = lastKnownBrightness;
 		int supersample = config.iconQuality().getSupersample();
+		boolean sharpen = lastKnownStretched;
 		ItemIconCache cache = iconCache;
 		renderExecutor.execute(() -> {
 			try {
@@ -908,7 +961,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 							cache.save(fingerprint, null);
 						return;
 					}
-					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth > 0, palette);
+					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth > 0, sharpen, palette);
 					combined = combined == null ? rendered : ItemIconRasterizer.compositeOver(rendered, combined);
 				}
 				icon.outlineRing = ItemIconRasterizer.outlineRing(combined, PATCH_WIDTH, PATCH_HEIGHT);
@@ -1074,16 +1127,19 @@ public class HdItemIcons extends WidgetItemOverlay {
 			}
 		}
 
+		// Detected first, since it samples the pixels the loop below marks for inpainting
 		int shadowColor = detectUniformShadowColor(reference);
-		if (shadowColor != 0) {
-			for (int patch = 0; patch < PATCH_SIZE; patch++)
-				if (reference.has(patch, FLAG_SHADOW))
-					patchResolved[patch] = false;
-		}
+		// The game's shadow goes whether or not its colour could be identified: a colour we can't
+		// match means we draw no shadow of our own, not that we keep theirs. Leaving it behind
+		// only stays hidden while our icon covers it, so a custom rotation exposes it as a fringe.
+		for (int patch = 0; patch < PATCH_SIZE; patch++)
+			if (reference.has(patch, FLAG_SHADOW))
+				patchResolved[patch] = false;
 
-		// Most of the patch (everything outside the item's own silhouette) is already resolved
-		// before diffusion starts, so a pass commonly finishes the job in one go - stop as soon
-		// as a pass makes no further progress instead of always running the full budget.
+		// Each pass only reaches one pixel further in, and the pixels it hasn't reached still hold
+		// the game's icon, so this runs until the whole silhouette is covered rather than to a
+		// fixed budget. Stopping early left the middle of the icon in place, which only stayed
+		// hidden while ours covered the same shape - a custom rotation exposes it.
 		for (int pass = 0; pass < INPAINT_PASSES; pass++)
 			if (!spreadKnownColorsOnce())
 				break;

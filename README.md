@@ -43,6 +43,11 @@ item definition's own `zoom2d` / `xOffset2d` / `yOffset2d` / `xan2d` / `yan2d` /
 - **Edit icon rotation hotkey** — what to hold while right-clicking to get the edit option.
   `Shift` by default.
 
+## Plugin API
+
+Other plugins can clear a cached icon, or listen for this one starting and stopping, via
+RuneLite's `PluginMessage`. See [docs/api.md](docs/api.md).
+
 ## Credit
 
 Original idea by Maiz.

@@ -12,10 +12,13 @@ import java.awt.Rectangle;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -734,7 +737,47 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	/** The cache is keyed by the game's own icon, which a saved rotation doesn't change. */
 	public void clearRenderCache(int itemId) {
-		renderedIcons.entrySet().removeIf(entry -> entry.getValue().itemId == itemId);
+		clearRenderCache(Set.of(itemId));
+	}
+
+	public void clearRenderCache(Collection<Integer> itemIds) {
+		if (itemIds.isEmpty())
+			return;
+
+		Set<Integer> targets = Set.copyOf(itemIds);
+		List<Long> cleared = new ArrayList<>();
+		renderedIcons.entrySet().removeIf(entry -> {
+			if (!targets.contains(entry.getValue().itemId))
+				return false;
+			cleared.add(entry.getKey());
+			return true;
+		});
+		deleteCachedImages(cleared);
+	}
+
+	public void clearRenderCache() {
+		List<Long> cleared = new ArrayList<>(renderedIcons.keySet());
+		renderedIcons.clear();
+		settledContainers.clear();
+		deleteCachedImages(cleared);
+	}
+
+	private void deleteCachedImages(List<Long> fingerprints) {
+		Filepath directory = iconCacheDirectory;
+		ExecutorService executor = renderExecutor;
+		if (directory == null || executor == null || fingerprints.isEmpty())
+			return;
+
+		executor.execute(() -> {
+			for (long fingerprint : fingerprints) {
+				Filepath file = directory.join(Long.toHexString(fingerprint) + ".bin");
+				try {
+					file.deleteIfExists();
+				} catch (IOException e) {
+					log.debug("Couldn't delete cached icon {}", file, e);
+				}
+			}
+		});
 	}
 
 	private synchronized int[] paletteFor(double brightness) {

@@ -452,6 +452,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
 		}
+
+		// Every frame, so icons are prepared as soon as the game sends the items, not once an interface shows them
+		prefetchQueuedContainers();
 	}
 
 	@Subscribe
@@ -485,7 +488,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 			return null;
 		super.render(graphics);
 		cutOutDraggedItems();
-		prefetchQueuedContainers();
 		return null;
 	}
 

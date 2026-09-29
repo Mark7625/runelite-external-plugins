@@ -6,8 +6,6 @@ import io.mark.hditemicons.IconQuality;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,8 +70,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int INPAINT_PASSES = 3;
 	private static final float DRAGGED_OPACITY = 128 / 256f;
 	private static final float MIN_SHAPE_COVERAGE = .9f;
-	// Changed whenever icons are drawn differently, so the ones kept on disk are drawn again
-	private static final int ICON_VERSION = 2;
 
 	// We paint a small margin around the icon too, since our render can spill slightly past
 	// the game's own tighter bounding box.
@@ -96,6 +92,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	 */
 	private static final class RenderedIcon {
 		volatile boolean failed;
+		volatile boolean uncached;
 		volatile boolean[] outlineRing;
 		volatile int[] pixels;
 		int[] selectedPixels;
@@ -148,7 +145,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		private static long fingerprintOf(int itemId, int borderWidth, int quality, int[] pixels) {
 			long h = 0xCBF29CE484222325L; // FNV-1a
-			h = mix(h, ICON_VERSION);
 			h = mix(h, itemId);
 			h = mix(h, borderWidth);
 			h = mix(h, quality);
@@ -292,6 +288,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private IconQuality lastKnownQuality;
 	@Nullable
 	private Filepath iconCacheDirectory;
+	@Nullable
+	private ItemIconCache iconCache;
 
 	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
 		@Override
@@ -372,6 +370,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 				if (!dataDirectory.isDirectory())
 					dataDirectory.createDirectories();
 				iconCacheDirectory = dataDirectory;
+				renderExecutor.execute(() -> ItemIconCache.removeUnused(dataDirectory));
 			} catch (IOException e) {
 				log.debug("Couldn't create the disk icon cache directory {}; falling back to memory only", dataDirectory, e);
 			}
@@ -408,6 +407,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		renderExecutor = null;
 
 		iconCacheDirectory = null;
+		iconCache = null;
 		renderedIcons.clear();
 		referenceIcons.clear();
 		resolvedStackModels.clear();
@@ -448,6 +448,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
+			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, PATCH_SIZE);
+			if (iconCache != null)
+				renderExecutor.execute(iconCache::markUsed);
 		}
 	}
 
@@ -633,16 +636,45 @@ public class HdItemIcons extends WidgetItemOverlay {
 				return PENDING;
 
 			icon = new RenderedIcon();
+			renderedIcons.put(reference.fingerprint, icon);
+			if (iconCache != null) {
+				loadIcon(icon, iconCache, reference.fingerprint);
+				return icon;
+			}
+			icon.uncached = true;
+		}
+		if (icon.uncached) {
+			if (!consumeRenderBudget(visibleNow))
+				return PENDING;
+
 			int modelItemId = resolveModelItemId(itemId, quantity, borderWidth, reference);
 			if (modelItemId == -1)
 				return null;
-			if (modelItemId == -2)
+			icon.uncached = false;
+			if (modelItemId == -2) {
 				icon.failed = true;
-			else
+				ItemIconCache cache = iconCache;
+				if (cache != null)
+					renderExecutor.execute(() -> cache.save(reference.fingerprint, null));
+			} else {
 				beginRenderingIcon(icon, modelItemId, borderWidth, reference.fingerprint);
-			renderedIcons.put(reference.fingerprint, icon);
+			}
 		}
 		return icon.failed ? null : icon;
+	}
+
+	private void loadIcon(RenderedIcon icon, ItemIconCache cache, long fingerprint) {
+		renderExecutor.execute(() -> {
+			int[] kept = cache.load(fingerprint);
+			if (kept == null) {
+				icon.uncached = true;
+			} else if (kept.length == 0) {
+				icon.failed = true;
+			} else {
+				icon.outlineRing = ItemIconRasterizer.outlineRing(kept, PATCH_WIDTH, PATCH_HEIGHT);
+				icon.pixels = kept;
+			}
+		});
 	}
 
 	private boolean consumeRenderBudget(boolean visibleNow) {
@@ -768,24 +800,17 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		double brightness = lastKnownBrightness;
 		int supersample = config.iconQuality().getSupersample();
-		Filepath cacheFile = iconCacheDirectory == null ? null : cacheFileFor(fingerprint);
+		ItemIconCache cache = iconCache;
 		renderExecutor.execute(() -> {
 			try {
-				if (cacheFile != null) {
-					int[] cached = readCachedPixels(cacheFile);
-					if (cached != null) {
-						icon.outlineRing = ItemIconRasterizer.outlineRing(cached, PATCH_WIDTH, PATCH_HEIGHT);
-						icon.pixels = cached;
-						return;
-					}
-				}
-
 				int[] palette = paletteFor(brightness);
 				int[] combined = null;
 				for (ModelLayer layer : layers) {
 					ItemIconRasterizer rasterizer = new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau, supersample);
 					if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette)) {
 						icon.failed = true;
+						if (cache != null)
+							cache.save(fingerprint, null);
 						return;
 					}
 					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth > 0, palette);
@@ -794,46 +819,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 				icon.outlineRing = ItemIconRasterizer.outlineRing(combined, PATCH_WIDTH, PATCH_HEIGHT);
 				icon.pixels = combined;
 
-				if (cacheFile != null)
-					writeCachedPixels(cacheFile, combined);
+				if (cache != null)
+					cache.save(fingerprint, combined);
 			} catch (Throwable ex) {
 				log.debug("Unable to render an HD icon for item {}:", itemId, ex);
 				icon.failed = true;
 			}
 		});
-	}
-
-	private Filepath cacheFileFor(long fingerprint) {
-		return iconCacheDirectory.join(Long.toHexString(fingerprint) + ".bin");
-	}
-
-	/**
-	 * Client thread never calls this - only from within the render executor. Raw ints, not
-	 * Java object serialization; a size mismatch (e.g. after a plugin update changes the icon
-	 * dimensions) is treated as a cache miss rather than trusted.
-	 */
-	@Nullable
-	private int[] readCachedPixels(Filepath file) {
-		if (!file.isFile())
-			return null;
-		try (DataInputStream in = new DataInputStream(file.openInputStream())) {
-			int[] pixels = new int[PATCH_SIZE];
-			for (int i = 0; i < pixels.length; i++)
-				pixels[i] = in.readInt();
-			return pixels;
-		} catch (IOException e) {
-			log.debug("Couldn't read cached icon {}, will re-render", file, e);
-			return null;
-		}
-	}
-
-	private void writeCachedPixels(Filepath file, int[] pixels) {
-		try (DataOutputStream out = new DataOutputStream(file.openOutputStream())) {
-			for (int pixel : pixels)
-				out.writeInt(pixel);
-		} catch (IOException e) {
-			log.debug("Couldn't write icon cache file {}", file, e);
-		}
 	}
 
 	@Nullable

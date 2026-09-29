@@ -322,6 +322,32 @@ class ItemIconRasterizer {
 	}
 
 	/**
+	 * The pixels right outside the icon, where the game draws outlines.
+	 */
+	static boolean[] outlineRing(int[] pixels, int width, int height) {
+		return ring(filled(pixels), width, height);
+	}
+
+	private static boolean[] filled(int[] pixels) {
+		boolean[] filled = new boolean[pixels.length];
+		for (int i = 0; i < pixels.length; i++)
+			filled[i] = pixels[i] >>> 24 >= 128;
+		return filled;
+	}
+
+	private static boolean[] ring(boolean[] filled, int width, int height) {
+		boolean[] ring = new boolean[filled.length];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int i = y * width + x;
+				ring[i] = !filled[i] && (x > 0 && filled[i - 1] || x < width - 1 && filled[i + 1]
+					|| y > 0 && filled[i - width] || y < height - 1 && filled[i + width]);
+			}
+		}
+		return ring;
+	}
+
+	/**
 	 * Alpha-composites {@code top} over {@code bottom}, both straight (non-premultiplied) ARGB.
 	 */
 	static int[] compositeOver(int[] top, int[] bottom) {

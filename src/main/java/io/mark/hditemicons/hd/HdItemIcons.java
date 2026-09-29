@@ -707,7 +707,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 			int modelItemId = resolveModelItemId(itemId, quantity, borderWidth, reference);
 			if (modelItemId == -1)
-				return null;
+				return PENDING;
 			icon.uncached = false;
 			if (modelItemId == -2) {
 				icon.failed = true;

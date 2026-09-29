@@ -3,6 +3,7 @@ package io.mark.hditemicons;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.config.Range;
 
 @ConfigGroup(HdItemIconsConfig.GROUP)
@@ -42,5 +43,26 @@ public interface HdItemIconsConfig extends Config {
 	)
 	default int renderThreadCount() {
 		return 2;
+	}
+
+	@ConfigItem(
+		keyName = "customRotationsEnabled",
+		name = "Custom icon rotations",
+		description = "Turn off to render every item's default icon rotation and ignore any custom rotations"
+			+ " you've saved. Saved rotations aren't deleted, so re-enabling restores them.",
+		position = 3
+	)
+	default boolean customRotationsEnabled() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "editRotationHotkey",
+		name = "Edit icon rotation hotkey",
+		description = "Hold this while right-clicking an item to add an \"Edit icon rotation\" option to its menu.",
+		position = 4
+	)
+	default Keybind editRotationHotkey() {
+		return Keybind.SHIFT;
 	}
 }

@@ -1,0 +1,29 @@
+// Standalone, with its own settings.gradle, so the cache library never reaches the plugin jar
+plugins {
+	id 'java'
+	id 'application'
+}
+
+repositories {
+	maven {
+		url = 'https://repo.runelite.net'
+		content {
+			includeGroupByRegex("net\\.runelite.*")
+		}
+	}
+	mavenCentral()
+}
+
+dependencies {
+	// Newest published cache library, so a cache format change is fixed by RuneLite, not here
+	implementation 'net.runelite:cache:latest.release'
+}
+
+application {
+	mainClass = 'io.mark.hditemicons.tools.GenerateItemRenderSheet'
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	options.release.set(11)
+}

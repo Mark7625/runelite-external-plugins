@@ -17,7 +17,7 @@ class ItemIconRasterizer {
 	static final int ICON_WIDTH = 36;
 	static final int ICON_HEIGHT = 32;
 
-	private static final int PROJECTION_SCALE = 512;
+	static final int PROJECTION_SCALE = 512;
 	private static final int PROJECTION_ORIGIN = 16;
 	private static final int FIT_ITERATIONS = 10;
 	private static final double FIT_TOLERANCE = 0.001;
@@ -119,6 +119,8 @@ class ItemIconRasterizer {
 	private final int supersample;
 	private final double[] posX, posY, posZ;
 	private double centerOffsetX, centerOffsetY, cameraDistance;
+	// The baseline every camera placement starts from, before any pan is layered on top.
+	private final double naturalOffsetX, naturalOffsetY;
 
 	// Scratch buffers reused across the many renderSamples() calls a single fit performs
 	// (up to FIT_ITERATIONS wide renders plus the final render), to avoid re-allocating
@@ -127,12 +129,22 @@ class ItemIconRasterizer {
 	private final long[] sortKeysScratch;
 	private int[] samplesScratch;
 
+	private static final int UNITY_RESIZE = 128;
+
 	/**
 	 * @param supersample how many samples per axis (so {@code supersample * supersample} samples
 	 *                    per pixel) to render before downsampling - the plugin's configurable
 	 *                    icon quality setting.
 	 */
 	ItemIconRasterizer(IconModel model, int pitchJau, int yawJau, int rollJau, int supersample) {
+		this(model, pitchJau, yawJau, rollJau, UNITY_RESIZE, UNITY_RESIZE, UNITY_RESIZE, supersample);
+	}
+
+	/**
+	 * @param resizeX128 per-axis model scale in the cache's resizeX/Y/Z units, 128 being 100%.
+	 */
+	ItemIconRasterizer(IconModel model, int pitchJau, int yawJau, int rollJau,
+						double resizeX128, double resizeY128, double resizeZ128, int supersample) {
 		this.model = model;
 		this.supersample = supersample;
 		int vertexCount = model.vertexX.length;
@@ -143,11 +155,15 @@ class ItemIconRasterizer {
 		double roll = rollJau / IconMath.TURN * 2 * Math.PI;
 		double yaw = yawJau / IconMath.TURN * 2 * Math.PI;
 		double pitch = pitchJau / IconMath.TURN * 2 * Math.PI;
+		double resizeX = resizeX128 / UNITY_RESIZE;
+		double resizeY = resizeY128 / UNITY_RESIZE;
+		double resizeZ = resizeZ128 / UNITY_RESIZE;
 
+		// Resize applies in local space, before rotation, the same order the client uses
 		for (int i = 0; i < vertexCount; i++) {
-			double x = model.vertexX[i];
-			double y = model.vertexY[i];
-			double z = model.vertexZ[i];
+			double x = model.vertexX[i] * resizeX;
+			double y = model.vertexY[i] * resizeY;
+			double z = model.vertexZ[i] * resizeZ;
 
 			double[] step1 = rotate(x, y, -roll);
 			x = step1[0];
@@ -166,6 +182,16 @@ class ItemIconRasterizer {
 			posZ[i] = z;
 		}
 
+		double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+		for (int i = 0; i < vertexCount; i++) {
+			minX = Math.min(minX, posX[i]);
+			minY = Math.min(minY, posY[i]);
+			maxX = Math.max(maxX, posX[i]);
+			maxY = Math.max(maxY, posY[i]);
+		}
+		naturalOffsetX = -(minX + maxX) / 2;
+		naturalOffsetY = -(minY + maxY) / 2;
+
 		camX = new double[vertexCount];
 		camY = new double[vertexCount];
 		camZ = new double[vertexCount];
@@ -177,6 +203,17 @@ class ItemIconRasterizer {
 	private static double[] rotate(double u, double v, double angle) {
 		double s = Math.sin(angle), c = Math.cos(angle);
 		return new double[]{u * c - v * s, u * s + v * c};
+	}
+
+	/**
+	 * Places the camera explicitly instead of fitting it to a reference icon. {@code offsetX}/
+	 * {@code offsetY} are xOffset2d/yOffset2d-style nudges on top of the model's own centering,
+	 * not the whole pan - the cache's values are only ever a few units off centre.
+	 */
+	void placeExplicitly(double cameraDistance, double offsetX, double offsetY) {
+		this.cameraDistance = cameraDistance;
+		this.centerOffsetX = naturalOffsetX + offsetX;
+		this.centerOffsetY = naturalOffsetY + offsetY;
 	}
 
 	/**
@@ -193,20 +230,14 @@ class ItemIconRasterizer {
 			return false;
 
 		double maxRadius = 0;
-		double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
-		for (int i = 0; i < posX.length; i++) {
+		for (int i = 0; i < posX.length; i++)
 			maxRadius = Math.max(maxRadius, Math.sqrt(posX[i] * posX[i] + posY[i] * posY[i] + posZ[i] * posZ[i]));
-			minX = Math.min(minX, posX[i]);
-			minY = Math.min(minY, posY[i]);
-			maxX = Math.max(maxX, posX[i]);
-			maxY = Math.max(maxY, posY[i]);
-		}
 
 		// Fitted by spread (the silhouette's radius of gyration) rather than raw area, since
 		// thin shapes render thicker in the game's icons than their true silhouette area implies.
 		cameraDistance = maxRadius + PROJECTION_SCALE * maxRadius / Math.sqrt(target.coverage / Math.PI);
-		centerOffsetX = -(minX + maxX) / 2;
-		centerOffsetY = -(minY + maxY) / 2;
+		centerOffsetX = naturalOffsetX;
+		centerOffsetY = naturalOffsetY;
 
 		for (int pass = 0; pass < FIT_ITERATIONS; pass++) {
 			int[] wide = renderSamples(cameraDistance, 1, 1, -ICON_WIDTH, -ICON_HEIGHT, ICON_WIDTH * 3, ICON_HEIGHT * 3, 0, palette);

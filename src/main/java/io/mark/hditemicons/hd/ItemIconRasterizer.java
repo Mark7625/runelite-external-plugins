@@ -227,6 +227,13 @@ class ItemIconRasterizer {
 	 * confirms the match is close enough to trust. Returns false if no plausible fit is found.
 	 */
 	boolean fitToReferenceSilhouette(int[] reference, int[] palette) {
+		return fitToReferenceSilhouette(reference, palette, true);
+	}
+
+	/**
+	 * Images with colours of their own, like the runes RuneLite's Rune Pouch plugin draws, only have to match in shape.
+	 */
+	boolean fitToReferenceSilhouette(int[] reference, int[] palette, boolean matchColors) {
 		double[] targetCoverage = new double[reference.length];
 		for (int i = 0; i < reference.length; i++)
 			targetCoverage[i] = reference[i] == 0 ? 0 : 1;
@@ -268,7 +275,7 @@ class ItemIconRasterizer {
 		}
 
 		int[] fitted = renderSamples(cameraDistance, 1, 1, 0, 0, ICON_WIDTH, ICON_HEIGHT, palette);
-		return verifiesAgainst(fitted, reference, target.coverage);
+		return verifiesAgainst(fitted, reference, target.coverage, matchColors);
 	}
 
 	private static final class Silhouette {
@@ -304,7 +311,7 @@ class ItemIconRasterizer {
 	 * Confirms a solved camera placement is actually a good match: few disagreeing pixels
 	 * (allowing for antialiasing noise near edges) and similar average colour.
 	 */
-	private boolean verifiesAgainst(int[] fitted, int[] reference, double referenceCoverage) {
+	private boolean verifiesAgainst(int[] fitted, int[] reference, double referenceCoverage, boolean matchColors) {
 		boolean[] weDrew = new boolean[fitted.length];
 		boolean[] weDrewFaintly = new boolean[fitted.length];
 		boolean[] theyDrew = new boolean[fitted.length];
@@ -331,7 +338,7 @@ class ItemIconRasterizer {
 
 		if (disagreements > Math.max(MAX_MISMATCHED_PIXELS, MAX_MISMATCHED_FRACTION * referenceCoverage))
 			return false;
-		for (int c = 0; c < 3; c++)
+		for (int c = 0; c < 3 && matchColors; c++)
 			if (Math.abs(ourColor[c] / ourCoverage - theirColor[c] / referenceCoverage) > MAX_CHANNEL_ERROR)
 				return false;
 		return true;

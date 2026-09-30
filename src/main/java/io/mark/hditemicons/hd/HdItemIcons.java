@@ -9,7 +9,9 @@ import io.mark.hditemicons.ItemRenderSheet;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -17,11 +19,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
+import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
@@ -29,6 +33,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.BufferProvider;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
+import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Model;
@@ -39,6 +45,7 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
+import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -193,8 +200,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 		final int borderWidth;
 		@Nullable
 		final CustomRotation placement;
+		final boolean matchColors;
 
-		ModelLayer(ItemIconRasterizer.IconModel model, int pitchJau, int yawJau, int rollJau, int[] referencePixels, int borderWidth, @Nullable CustomRotation placement) {
+		ModelLayer(ItemIconRasterizer.IconModel model, int pitchJau, int yawJau, int rollJau, int[] referencePixels, int borderWidth, @Nullable CustomRotation placement,
+			boolean matchColors) {
 			this.model = model;
 			this.pitchJau = pitchJau;
 			this.yawJau = yawJau;
@@ -202,6 +211,46 @@ public class HdItemIcons extends WidgetItemOverlay {
 			this.referencePixels = referencePixels;
 			this.borderWidth = borderWidth;
 			this.placement = placement;
+			this.matchColors = matchColors;
+		}
+	}
+
+	/**
+	 * One of the small rune images RuneLite's Rune Pouch plugin draws over the pouch, which are drawn in high quality too.
+	 */
+	private static final class RuneImage {
+		final int itemId;
+		final int width, height;
+		final int[] pixels;
+		// Its opaque pixels, as offsets on an item's patch from where the image is drawn
+		final int[] offsets, colors;
+		// Where the image is in the silhouette the rune's model is fitted to
+		final int left, top;
+		final int[] silhouette;
+		final long fingerprint;
+
+		RuneImage(int itemId, int width, int height, int[] pixels, int[] offsets, int[] colors, int left, int top, int[] silhouette, long fingerprint) {
+			this.itemId = itemId;
+			this.width = width;
+			this.height = height;
+			this.pixels = pixels;
+			this.offsets = offsets;
+			this.colors = colors;
+			this.left = left;
+			this.top = top;
+			this.silhouette = silhouette;
+			this.fingerprint = fingerprint;
+		}
+	}
+
+	private static final class RuneMatch {
+		final RuneImage image;
+		final int patchX, patchY;
+
+		RuneMatch(RuneImage image, int patchX, int patchY) {
+			this.image = image;
+			this.patchX = patchX;
+			this.patchY = patchY;
 		}
 	}
 
@@ -247,6 +296,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 		float opacity;
 		boolean overlaid;
 		int lastUsed;
+		List<RuneMatch> runes = List.of();
+		List<RuneImage> runeImages;
+		boolean runesPending;
 
 		boolean holds(PlacedIcon placed, float opacity) {
 			return reference == placed.reference && pixels == placed.pixels && placed.patchArea.equals(patchArea) && this.opacity == opacity;
@@ -401,6 +453,11 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private final int[] patchColor = new int[PATCH_SIZE];
 	private final boolean[] patchResolved = new boolean[PATCH_SIZE];
 	private final boolean[] patchResolvedScratch = new boolean[PATCH_SIZE];
+
+	private final int[] runePixels = new int[PATCH_SIZE];
+	private final boolean[] runeImagePixels = new boolean[PATCH_SIZE];
+	@Nullable
+	private volatile List<RuneImage> runeImages;
 
 	private int[] cachedPalette;
 	private double cachedPaletteBrightness;
@@ -923,7 +980,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 				return;
 			}
 		}
+		beginRendering(icon, layers, itemId, fingerprint);
+	}
 
+	private void beginRendering(RenderedIcon icon, ModelLayer[] layers, int itemId, long fingerprint) {
 		double brightness = lastKnownBrightness;
 		int supersample = config.iconQuality().getSupersample();
 		boolean sharpen = lastKnownStretched;
@@ -940,7 +1000,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 							placement.resizeX, placement.resizeY, placement.resizeZ, supersample);
 					if (placement != null) {
 						rasterizer.placeExplicitly(placement.zoom2d, placement.offsetX, placement.offsetY);
-					} else if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette)) {
+					} else if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette, layer.matchColors)) {
 						icon.failed = true;
 						if (cache != null)
 							cache.save(fingerprint, null);
@@ -973,7 +1033,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		int pitch = override != null ? override.xan2d : item.getXan2d();
 		int yaw = override != null ? override.yan2d : item.getYan2d();
 		int roll = override != null ? override.zan2d : item.getZan2d();
-		return new ModelLayer(iconModel, pitch, yaw, roll, referencePixels, borderWidth, override);
+		return new ModelLayer(iconModel, pitch, yaw, roll, referencePixels, borderWidth, override, true);
 	}
 
 	@Nullable
@@ -1270,10 +1330,18 @@ public class HdItemIcons extends WidgetItemOverlay {
 			writePatch(framePixels, frameWidth, placed, placed.composed);
 			return;
 		}
-		if (slot != null && slot.overlaid && samePatch(placed, placed.overlays, slot.overlays)) {
+		if (runeImages == null && active)
+			loadRuneImages();
+		List<RuneImage> images = runeImages;
+		boolean sameOverlays = slot != null && slot.overlaid && slot.runeImages == images && samePatch(placed, placed.overlays, slot.overlays);
+		if (sameOverlays && !slot.runesPending) {
 			writePatch(framePixels, frameWidth, placed, slot.drawn);
 			return;
 		}
+
+		// Dragged items are worked out every frame, so they keep RuneLite's rune images
+		List<RuneMatch> runes = slot == null || images == null ? List.of() : sameOverlays ? slot.runes : findRunes(placed, images);
+		boolean runesPending = layOutRunes(runes);
 
 		ReferenceIcon reference = placed.reference;
 		int fill = shapeColor(placed, FLAG_ITEM);
@@ -1293,6 +1361,11 @@ public class HdItemIcons extends WidgetItemOverlay {
 					outline != 0 && reference.has(patch, FLAG_OUTLINE) && overlay == outline;
 				if (redrawn)
 					overlay = 0;
+				// RuneLite's rune images make way for our runes
+				if (runeImagePixels[patch])
+					overlay = runePixels[patch];
+				else if (runePixels[patch] != 0)
+					overlay = over(overlay, runePixels[patch]);
 
 				float item = alpha(placed.pixels[patch]);
 				float shadow = localX - 1 >= -MARGIN && localY - 1 >= -MARGIN ? alpha(placed.pixels[patchIndex(localX - 1, localY - 1)]) : 0;
@@ -1304,8 +1377,163 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (slot != null) {
 			System.arraycopy(placed.overlays, 0, slot.overlays, 0, PATCH_SIZE);
 			slot.overlaid = true;
+			slot.runes = runes;
+			slot.runeImages = images;
+			slot.runesPending = runesPending;
 		}
 		writePatch(framePixels, frameWidth, placed, drawn);
+	}
+
+	/**
+	 * RuneLite's Rune Pouch plugin keeps its rune images next to its classes, named after the runes, like air_rune.png.
+	 */
+	private void loadRuneImages() {
+		runeImages = List.of();
+		EnumComposition runes = client.getEnum(EnumID.RUNEPOUCH_RUNE);
+		if (runes == null)
+			return;
+
+		Map<Integer, String> paths = new HashMap<>();
+		for (int itemId : runes.getIntVals())
+			paths.put(itemId, "/net/runelite/client/plugins/runepouch/"
+				+ client.getItemDefinition(itemId).getName().toLowerCase(Locale.ROOT).replace(' ', '_') + ".png");
+		renderExecutor.execute(() -> {
+			List<RuneImage> images = new ArrayList<>();
+			paths.forEach((itemId, path) -> {
+				try (InputStream in = RuneLite.class.getResourceAsStream(path)) {
+					if (in == null)
+						return;
+					BufferedImage image;
+					synchronized (ImageIO.class) {
+						image = ImageIO.read(in);
+					}
+					if (image != null && image.getWidth() <= ICON_WIDTH && image.getHeight() <= ICON_HEIGHT)
+						images.add(runeImage(itemId, image));
+				} catch (IOException | RuntimeException ex) {
+					log.debug("Unable to load {}:", path, ex);
+				}
+			});
+			runeImages = images;
+		});
+	}
+
+	private static RuneImage runeImage(int itemId, BufferedImage image) {
+		int width = image.getWidth();
+		int height = image.getHeight();
+		int[] pixels = image.getRGB(0, 0, width, height, null, 0, width);
+		int left = (ICON_WIDTH - width) / 2;
+		int top = (ICON_HEIGHT - height) / 2;
+		int[] silhouette = new int[ICON_WIDTH * ICON_HEIGHT];
+		int opaque = 0;
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int pixel = pixels[y * width + x];
+				if (pixel >>> 24 == 0xFF)
+					opaque++;
+				// The black ring around the rune is its outline, which goes around ours again
+				boolean outline = pixel == 0xFF000000 && (isClear(pixels, width, height, x - 1, y) || isClear(pixels, width, height, x + 1, y)
+					|| isClear(pixels, width, height, x, y - 1) || isClear(pixels, width, height, x, y + 1));
+				if (pixel >>> 24 != 0 && !outline)
+					silhouette[(top + y) * ICON_WIDTH + left + x] = pixel;
+			}
+		}
+
+		int[] offsets = new int[opaque];
+		int[] colors = new int[opaque];
+		for (int i = 0, y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				if (pixels[y * width + x] >>> 24 == 0xFF) {
+					offsets[i] = y * PATCH_WIDTH + x;
+					colors[i++] = pixels[y * width + x];
+				}
+			}
+		}
+		// Kept on disk with the icons, under the silhouette the rune is fitted to
+		long fingerprint = ReferenceIcon.fingerprintOf(itemId, 1, 0, silhouette);
+		return new RuneImage(itemId, width, height, pixels, offsets, colors, left, top, silhouette, fingerprint);
+	}
+
+	private static boolean isClear(int[] pixels, int width, int height, int x, int y) {
+		return x < 0 || y < 0 || x >= width || y >= height || pixels[y * width + x] >>> 24 == 0;
+	}
+
+	/**
+	 * Only looked for again when what other overlays draw over the item changes.
+	 */
+	private List<RuneMatch> findRunes(PlacedIcon placed, List<RuneImage> images) {
+		int left = placed.patchArea.x - placed.bounds.x + MARGIN;
+		int top = placed.patchArea.y - placed.bounds.y + MARGIN;
+		int right = left + placed.patchArea.width;
+		int bottom = top + placed.patchArea.height;
+		List<RuneMatch> runes = new ArrayList<>();
+		for (RuneImage image : images)
+			for (int y = top; y + image.height <= bottom; y++)
+				for (int x = left; x + image.width <= right; x++)
+					if (isDrawnAt(placed.overlays, image, y * PATCH_WIDTH + x))
+						runes.add(new RuneMatch(image, x, y));
+		return runes;
+	}
+
+	private static boolean isDrawnAt(int[] overlays, RuneImage image, int at) {
+		for (int i = 0; i < image.offsets.length; i++)
+			if (overlays[at + image.offsets[i]] != image.colors[i])
+				return false;
+		return true;
+	}
+
+	/**
+	 * Puts the runes that are ready where RuneLite drew their images, and returns whether any are still being rendered.
+	 */
+	private boolean layOutRunes(List<RuneMatch> runes) {
+		Arrays.fill(runePixels, 0);
+		Arrays.fill(runeImagePixels, false);
+		boolean pending = false;
+		for (RuneMatch rune : runes) {
+			RenderedIcon icon = runeIcon(rune.image);
+			if (icon == null)
+				continue;
+			int[] pixels = icon.pixels;
+			if (pixels == null) {
+				pending = true;
+				continue;
+			}
+
+			RuneImage image = rune.image;
+			for (int y = 0; y < image.height; y++) {
+				for (int x = 0; x < image.width; x++) {
+					int patch = (rune.patchY + y) * PATCH_WIDTH + rune.patchX + x;
+					runePixels[patch] = pixels[(image.top + MARGIN + y) * PATCH_WIDTH + image.left + MARGIN + x];
+					runeImagePixels[patch] = image.pixels[y * image.width + x] >>> 24 != 0;
+				}
+			}
+		}
+		return pending;
+	}
+
+	@Nullable
+	private RenderedIcon runeIcon(RuneImage image) {
+		RenderedIcon icon = renderedIcons.get(image.fingerprint);
+		if (icon == null) {
+			icon = new RenderedIcon();
+			icon.itemId = image.itemId;
+			renderedIcons.put(image.fingerprint, icon);
+			if (iconCache != null) {
+				loadIcon(icon, iconCache, image.fingerprint);
+				return icon;
+			}
+			icon.uncached = true;
+		}
+		if (icon.uncached) {
+			icon.uncached = false;
+			ItemComposition item = client.getItemDefinition(image.itemId);
+			ItemIconRasterizer.IconModel iconModel = captureModel(item);
+			if (iconModel == null)
+				icon.failed = true;
+			else
+				beginRendering(icon, new ModelLayer[]{new ModelLayer(iconModel, item.getXan2d(), item.getYan2d(), item.getZan2d(),
+					image.silhouette, 1, null, false)}, image.itemId, image.fingerprint);
+		}
+		return icon.failed ? null : icon;
 	}
 
 	private static int shapeColor(PlacedIcon placed, byte shape) {

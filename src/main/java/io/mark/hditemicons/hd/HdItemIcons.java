@@ -97,6 +97,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 		InterfaceID.SHOPSIDE,
 	};
 
+	// Icons in these layers are replaced right after the layer, before the rest of its interface is drawn over it
+	private static final int[] ITEM_LAYERS = {
+		InterfaceID.Bankmain.ITEMS, InterfaceID.SharedBank.ITEMS,
+		InterfaceID.RunePouch.POUCH, InterfaceID.RunePouch.INVENTORY,
+	};
+
 	/**
 	 * A queued or finished render. A shared {@link #PENDING} instance stands in for "still
 	 * being worked on" so callers don't need a separate lookup to check.
@@ -270,8 +276,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		OverlayCapture() {
 			for (int groupId : INVENTORY_LIKE_INTERFACES)
 				drawAfterInterface(groupId);
-			drawAfterLayer(InterfaceID.Bankmain.ITEMS);
-			drawAfterLayer(InterfaceID.SharedBank.ITEMS);
+			for (int layerId : ITEM_LAYERS)
+				drawAfterLayer(layerId);
 			// After the other item overlays
 			setPriority(PRIORITY_HIGHEST + 1);
 		}
@@ -411,8 +417,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		this.itemRenderSheet = itemRenderSheet;
 		for (int groupId : INVENTORY_LIKE_INTERFACES)
 			drawAfterInterface(groupId);
-		drawAfterLayer(InterfaceID.Bankmain.ITEMS);
-		drawAfterLayer(InterfaceID.SharedBank.ITEMS);
+		for (int layerId : ITEM_LAYERS)
+			drawAfterLayer(layerId);
 		// Ahead of other item overlays, so they draw on top of our replacement icon
 		setPriority(PRIORITY_LOW - 1);
 	}

@@ -31,11 +31,13 @@ import net.runelite.api.Client;
 import net.runelite.api.Constants;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
@@ -71,6 +73,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
+	private static final int[] KEPT_CONTAINERS = {InventoryID.INV, InventoryID.WORN};
 	private static final float DRAGGED_OPACITY = 128 / 256f;
 	private static final float MIN_SHAPE_COVERAGE = .9f;
 
@@ -451,6 +454,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 			// with no way left to remove it.
 			if (!active)
 				return;
+			// Also when turned on after logging in, before any of them changes
+			for (int containerId : new int[]{InventoryID.INV, InventoryID.WORN, InventoryID.BANK}) {
+				ItemContainer container = client.getItemContainer(containerId);
+				if (container != null)
+					watchedContainers.put(containerId, container.getItems());
+			}
 			overlayManager.add(this);
 			overlayManager.add(overlayCapture);
 			overlayManager.add(draggedItemPainter);
@@ -808,6 +817,17 @@ public class HdItemIcons extends WidgetItemOverlay {
 	 * the bank). Bounded by the same per-frame budget as on-screen items.
 	 */
 	private void prefetchQueuedContainers() {
+		// What's carried and worn stays ready, even while it isn't shown or the cache is full
+		for (int containerId : KEPT_CONTAINERS) {
+			Item[] items = watchedContainers.get(containerId);
+			if (items == null)
+				continue;
+			for (Item item : items) {
+				if (item.getId() != -1)
+					resolveIcon(item.getId(), item.getQuantity(), ItemQuantityMode.NEVER, 1, false);
+			}
+		}
+
 		for (Map.Entry<Integer, Item[]> entry : watchedContainers.entrySet()) {
 			int containerId = entry.getKey();
 			if (settledContainers.contains(containerId))
@@ -820,7 +840,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 				if (item.getId() == -1)
 					continue;
 				RenderedIcon icon = resolveIcon(item.getId(), item.getQuantity(), ItemQuantityMode.NEVER, 1, false);
-				if (icon == PENDING)
+				// A stack whose model is still being searched for doesn't hold up the rest
+				if (icon == PENDING && rendersStartedThisFrame >= MAX_NEW_RENDERS_PER_FRAME)
 					return;
 				settled &= icon == null || icon.pixels != null;
 			}

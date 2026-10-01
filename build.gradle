@@ -14,14 +14,14 @@ repositories {
 }
 
 def runeLiteVersion = 'latest.release'
-def pluginMainClass = 'io.mark.hditemicons.HdItemIconsPlugin'
-def pluginTestClass = 'io.mark.hditemicons.HdItemIconsPluginTest'
+def pluginMainClass = 'io.mark.hitsplats.HitsplatStylesPlugin'
+def pluginTestClass = 'io.mark.hitsplats.HitsplatStylesPluginTest'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
 
-	compileOnly 'org.projectlombok:lombok:1.18.30'
-	annotationProcessor 'org.projectlombok:lombok:1.18.30'
+	compileOnly 'org.projectlombok:lombok:1.18.42'
+	annotationProcessor 'org.projectlombok:lombok:1.18.42'
 
 	testImplementation 'junit:junit:4.13.1'
 	testImplementation 'org.mockito:mockito-core:4.+'
@@ -29,8 +29,8 @@ dependencies {
 	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
 }
 
-group = 'io.mark.hditemicons'
-version = '1.1'
+group = 'io.mark.hitsplats'
+version = '1.0'
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'

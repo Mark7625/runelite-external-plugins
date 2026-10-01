@@ -1,53 +1,79 @@
-# HQ Item Icons
+# Hitsplat Styles
 
-Sharper, high quality item icons. Renders each item's 3D model with antialiasing instead of
-using the game's default icon, in your inventory, bank, and equipment.
+Replaces the game's hitsplats with art from an earlier era - 2002, 2010 or 2011 - and can draw the
+2011 combat style icon beside them.
 
-## Before / After
+The client's own hitsplat sprites are blanked with a sprite override and the replacements are drawn
+by an overlay, which positions and animates them itself. Only the splats this plugin ships art for
+are blanked; burn, doom, sanity and the rest keep rendering natively.
 
-<table>
-<tr>
-<th>Before</th>
-<th>After</th>
-</tr>
-<tr>
-<td><img src="docs/off_bank.png" alt="Default item icons" width="400"></td>
-<td><img src="docs/on_bank.png" alt="HQ item icons" width="400"></td>
-</tr>
-<tr>
-<td><img src="docs/off_inventory.png" alt="Default item icons close-up" width="180"></td>
-<td><img src="docs/on_inventory.png" alt="HQ item icons close-up" width="180"></td>
-</tr>
-</table>
+## Layout
 
-## Custom icon rotations
+| Package | Holds |
+| --- | --- |
+| `io.mark.hitsplats` | `HitsplatStylesPlugin`, the entry point and event wiring |
+| `io.mark.hitsplats.config` | The config interface and its dropdown enums |
+| `io.mark.hitsplats.art` | Styles, the skin each splat type maps to, and image loading |
+| `io.mark.hitsplats.combat` | Working out which combat style a hit came from |
+| `io.mark.hitsplats.hit` | The hitsplats currently in the air |
+| `io.mark.hitsplats.overlay` | Drawing them |
 
-Hold **Shift** and right-click any item to get an **Edit icon rotation** option, which opens an
-editor for that item's icon camera. Drag the preview to rotate, right-drag to roll, and scroll to
-zoom, or switch to Pan or Scale to drag those instead — the nine fields underneath match the
-item definition's own `zoom2d` / `xOffset2d` / `yOffset2d` / `xan2d` / `yan2d` / `zan2d` /
-`resizeX` / `resizeY` / `resizeZ`.
-
-<img src="docs/icon_rotation.png" alt="Editing an item's icon rotation" width="534">
+Resources live under `src/main/resources/io/mark/hitsplats/` and are loaded by absolute path, so
+they stay in one place regardless of which package reads them.
 
 ## Config
 
-- **Icon cache storage** — `Memory` (default) or `Disk`. Disk keeps rendered icons between
-  client restarts so they don't need to be re-rendered.
-- **Icon quality** — `Low`, `Medium` (default), or `High`. Controls how much antialiasing is
-  used when rendering each icon; higher quality looks smoother but takes longer to render.
-- **Render threads** — how many background threads render icons at once. Higher can be faster
-  when many are queued (e.g. opening a full bank), at the cost of more CPU.
-- **Custom icon rotations** — on by default. Turn off to ignore any custom rotations you've
-  saved and render every item's default icon. Saved rotations aren't deleted.
-- **Edit icon rotation hotkey** — what to hold while right-clicking to get the edit option.
-  `Shift` by default.
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Style | 2010 | Which art pack to draw |
+| Combat style icons | All | Which styles draw a melee/ranged/magic/cannon icon beside the splat, or `Off` |
+| Tint other people's hits | Game default | The game dims hits the local player had no part in. `Never` gives everyone the bright art, `Always` dims all of it |
+| Hide blocked damage text | On | Drops the `0` from blocked hits, which suits styles whose block splat is an icon |
 
-## Plugin API
+The sprite override only takes effect when the client loads its sprites, so enabling the plugin
+while logged in prints a chat line asking you to relog. The same applies on the way out: the default
+hitsplats stay hidden until the next login.
 
-Other plugins can clear a cached icon, or listen for this one starting and stopping, via
-RuneLite's `PluginMessage`. See [docs/api.md](docs/api.md).
+## Adding a style
 
-## Credit
+Each style is a directory under `src/main/resources/io/mark/hitsplats/` named in
+`HitsplatStyle`, holding PNGs named after what they replace:
 
-Original idea by Maiz.
+```
+damage_normal.png   damage_tinted.png   damage_max.png
+block_normal.png    block_tinted.png
+poison_normal.png   poison_tinted.png
+venom_normal.png    venom_tinted.png
+disease_normal.png
+```
+
+`_normal` is the bright art the game uses when the local player is involved in the hit, `_tinted`
+the darker art for everyone else's. A pack doesn't need all of them - `HitsplatSkin` gives every
+splat a fallback chain, so a pack with only `damage_normal.png` and `block_normal.png` works and
+anything it adds beyond that takes precedence. Colour variants (`damage_cyan_normal` and friends)
+and the newer splat types are picked up automatically if you add files for them.
+
+If a pack's art sits high or low in its canvas, `HitsplatStyle` carries a per-style `textOffsetY` to
+nudge the damage number back into the middle of the splat. 2011 uses 3px.
+
+## Combat style icons
+
+Nothing in a hitsplat says which combat style caused it, so it is inferred, in this order:
+
+1. A cannonball projectile, by spotanim id.
+2. The projectile that landed on the actor as the splat appeared, looked up in
+   `projectile_styles.tsv`.
+3. The attacker's equipped weapon, by whichever attack bonus it carries most of. A player who
+   launched a projectile while holding a melee weapon is casting a spell.
+4. The attacker's animation, looked up in `attack_animations.tsv`.
+5. Failing all of that, magic - a projectile is never a melee hit.
+
+A hit with no projectile behind it at all is melee.
+
+Both tables were generated by matching constant names in `gameval.AnimationID` and
+`gameval.SpotanimID`. Those names don't exist at runtime, so the matching was done up front and the
+results shipped as resources; each row keeps its source constant in a third column so the tables can
+be corrected by hand.
+
+This is a guess, and it is wrong in places. An NPC has no weapon to read, so an NPC projectile that
+isn't in the table falls back to magic whether it was a spell or an arrow.

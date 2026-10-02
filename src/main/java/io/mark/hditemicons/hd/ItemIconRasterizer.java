@@ -23,6 +23,7 @@ class ItemIconRasterizer {
 	private static final double FIT_TOLERANCE = 0.001;
 	// Roughly what a 1.5x bilinear stretch costs in edge contrast
 	private static final int SHARPEN_PERCENT = 50;
+	private static final int MIN_THIN_LINE_COVERAGE = 48;
 	private static final int[] NEIGHBOR_X = { -1, 1, 0, 0 };
 	private static final int[] NEIGHBOR_Y = { 0, 0, -1, 1 };
 
@@ -411,16 +412,53 @@ class ItemIconRasterizer {
 	 */
 	private static int[] outline(int[] shape, int[] pixels, int width, int height) {
 		boolean[] filled = filled(shape);
+		boolean[] thin = thinLines(shape, filled, width, height);
+		for (int i = 0; i < filled.length; i++)
+			filled[i] |= thin[i];
 		removeSpurs(filled, width, height);
 		boolean[] ring = ring(filled, width, height);
 		int[] outlined = new int[pixels.length];
 		for (int i = 0; i < pixels.length; i++) {
-			if (filled[i])
+			if (filled[i] && thin[i])
+				outlined[i] = opaque(pixels[i], shape[i] >>> 24);
+			else if (filled[i])
 				outlined[i] = over(pixels[i], 0xFF000000);
 			else if (ring[i])
 				outlined[i] = 0xFF000000;
 		}
 		return outlined;
+	}
+
+	/**
+	 * Parts thinner than a pixel, like a crossbow's string, cover less than half of every pixel they cross, so they'd
+	 * be left out. They're kept a whole pixel wide: where they cover the most of their row or column, unlike the edge
+	 * of something wider, which only gets more covered further in.
+	 */
+	private static boolean[] thinLines(int[] shape, boolean[] filled, int width, int height) {
+		boolean[] thin = new boolean[shape.length];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int i = y * width + x;
+				int coverage = shape[i] >>> 24;
+				if (filled[i] || coverage < MIN_THIN_LINE_COVERAGE)
+					continue;
+				int left = x > 0 ? shape[i - 1] >>> 24 : 0;
+				int right = x < width - 1 ? shape[i + 1] >>> 24 : 0;
+				int up = y > 0 ? shape[i - width] >>> 24 : 0;
+				int down = y < height - 1 ? shape[i + width] >>> 24 : 0;
+				// Ties go to the first of the two, so a line split evenly over two pixels stays one wide
+				thin[i] = coverage > left && coverage >= right || coverage > up && coverage >= down;
+			}
+		}
+		return thin;
+	}
+
+	// Premultiplied colour with its coverage, as the colour it would have if it covered the whole pixel
+	private static int opaque(int pixel, int coverage) {
+		int result = 0xFF000000;
+		for (int shift = 0; shift < 24; shift += 8)
+			result |= Math.min(255, (pixel >>> shift & 0xFF) * 255 / coverage) << shift;
+		return result;
 	}
 
 	/**

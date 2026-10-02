@@ -163,7 +163,7 @@ public class HitsplatStylesPlugin extends Plugin {
 
 	private void loadSprites(boolean announceEmpty) {
 		boolean packs = config.resourcePacks();
-		sprites.load(config.shadowWidth(), config.splatSize(),
+		sprites.load(config.shadowWidth(),
 			packs ? this::overrideDirectory : () -> null,
 			applied -> clientThread.invokeLater(() -> announceResourcePack(packs, applied, announceEmpty)));
 	}
@@ -287,8 +287,7 @@ public class HitsplatStylesPlugin extends Plugin {
 
 		if (HitsplatStylesConfig.KEY_RESOURCE_PACKS.equals(event.getKey())) {
 			loadSprites(true);
-		} else if (HitsplatStylesConfig.KEY_SHADOW_WIDTH.equals(event.getKey())
-			|| HitsplatStylesConfig.KEY_SPLAT_SIZE.equals(event.getKey())) {
+		} else if (HitsplatStylesConfig.KEY_SHADOW_WIDTH.equals(event.getKey())) {
 			loadSprites(false);
 		}
 

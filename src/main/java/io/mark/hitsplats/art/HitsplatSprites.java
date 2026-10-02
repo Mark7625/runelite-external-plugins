@@ -32,6 +32,7 @@ public class HitsplatSprites
 	private static final String RESOURCE_ROOT = "/io/mark/hitsplats/";
 	private static final String ICON_DIRECTORY = "style_icons";
 	private static final int SHADOW_ALPHA = 120;
+	private static final int SUPERSAMPLE = 8;
 
 	private volatile Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> packs;
 	private volatile Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> packShadows;
@@ -46,7 +47,7 @@ public class HitsplatSprites
 		this.executor = executor;
 	}
 
-	public void load(int shadowRadius, int scalePercent, Supplier<Filepath> overrides, IntConsumer onLoaded)
+	public void load(int shadowRadius, Supplier<Filepath> overrides, IntConsumer onLoaded)
 	{
 		executor.execute(() ->
 		{
@@ -60,7 +61,7 @@ public class HitsplatSprites
 				StyleProperties properties = overrideRoot.loadProperties(style);
 				loadedProperties.put(style, properties);
 
-				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, properties.getSize() * scalePercent / 100, overrideRoot);
+				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, properties.getSize(), overrideRoot);
 				loaded.put(style, pack);
 				loadedShadows.put(style, outlinePack(pack, shadowRadius, properties));
 			}
@@ -303,6 +304,23 @@ public class HitsplatSprites
 		int width = Math.max(1, image.getWidth() * percent / 100);
 		int height = Math.max(1, image.getHeight() * percent / 100);
 
+		// A whole number of pixels per pixel is already perfect, and nearest neighbour keeps it razor sharp.
+		if (percent % 100 == 0)
+		{
+			return nearest(image, width, height);
+		}
+
+		// Anything else lands between pixels. Blowing the art up by a whole number first means every source pixel is
+		// still the same size, and averaging that back down to the target spreads the leftovers evenly instead of
+		// leaving some rows a pixel fatter than their neighbours.
+		BufferedImage supersampled = nearest(image,
+			image.getWidth() * SUPERSAMPLE, image.getHeight() * SUPERSAMPLE);
+
+		return average(supersampled, width, height);
+	}
+
+	private static BufferedImage nearest(BufferedImage image, int width, int height)
+	{
 		BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D graphics = out.createGraphics();
 		graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
@@ -310,6 +328,58 @@ public class HitsplatSprites
 		graphics.dispose();
 
 		return out;
+	}
+
+	private static BufferedImage average(BufferedImage image, int width, int height)
+	{
+		int sourceWidth = image.getWidth();
+		int sourceHeight = image.getHeight();
+		int[] pixels = image.getRGB(0, 0, sourceWidth, sourceHeight, null, 0, sourceWidth);
+		int[] out = new int[width * height];
+
+		for (int y = 0; y < height; y++)
+		{
+			int fromY = y * sourceHeight / height;
+			int toY = Math.max(fromY + 1, (y + 1) * sourceHeight / height);
+
+			for (int x = 0; x < width; x++)
+			{
+				int fromX = x * sourceWidth / width;
+				int toX = Math.max(fromX + 1, (x + 1) * sourceWidth / width);
+
+				long alpha = 0;
+				long red = 0;
+				long green = 0;
+				long blue = 0;
+				int count = 0;
+
+				for (int sourceY = fromY; sourceY < toY; sourceY++)
+				{
+					for (int sourceX = fromX; sourceX < toX; sourceX++)
+					{
+						int pixel = pixels[sourceY * sourceWidth + sourceX];
+						int pixelAlpha = pixel >>> 24;
+
+						// Weighted by alpha, so the transparent pixels around the splat don't drag its edges dark.
+						alpha += pixelAlpha;
+						red += ((pixel >> 16) & 0xFF) * pixelAlpha;
+						green += ((pixel >> 8) & 0xFF) * pixelAlpha;
+						blue += (pixel & 0xFF) * pixelAlpha;
+						count++;
+					}
+				}
+
+				int outAlpha = (int) (alpha / count);
+				out[y * width + x] = alpha == 0 ? 0 : (outAlpha << 24)
+					| ((int) (red / alpha) << 16)
+					| ((int) (green / alpha) << 8)
+					| (int) (blue / alpha);
+			}
+		}
+
+		BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+		scaled.setRGB(0, 0, width, height, out, 0, width);
+		return scaled;
 	}
 
 	private static BufferedImage trim(BufferedImage image)

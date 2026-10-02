@@ -15,7 +15,8 @@ venom, disease, burn and bleed splat is drawn in that era's art.
 - **Heal splats** - the game draws nothing when you heal, so this does, with the food or potion that
   did it beside the number.
 - **Burn and bleed** - covered too, in every style.
-- **Resize them** - scale the art up without blurring it, so the pixel art stays sharp.
+- **Resize them** - a resource pack can scale any style, with a filter built for pixel art so the
+  shape holds together.
 - **Bring your own art** - drop a PNG in the plugin's folder to replace any splat or icon.
 - **Float and fade** - splats drift up and fade away instead of blinking out.
 - **Drop shadows** - a soft shadow so splats stand out against bright ground.
@@ -26,7 +27,6 @@ venom, disease, burn and bleed splat is drawn in that era's art.
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Style | 2010 | The era your splats are drawn in |
-| Splat size | 100 | Scales the art, as a percentage. Stays sharp rather than blurring |
 | Use resource packs | On | Use your own PNGs from the plugin's folder in place of the built-in art |
 | Tint other people's hits | Game default | Dim hits you had no part in, as the game does |
 
@@ -99,7 +99,7 @@ textOffsetY=0
 
 | Key | What it does |
 | --- | --- |
-| `size` | Scales this style's art, as a percentage. Multiplies with the Splat size setting |
+| `size` | Scales this style's art, as a percentage. `200` stays perfectly pixel sharp; sizes in between are smoothed so the shape doesn't come out ragged |
 | `textColor` | Colour of the damage number |
 | `textShadowColor` | Colour of the drop shadow behind the number |
 | `shadowColor` | Colour of the soft outline behind the splat |
@@ -112,7 +112,7 @@ A few notes:
 
 - **Per style, not global.** Drop the same file in all four folders to change it everywhere.
 - **Size is up to you.** Splats are centred on the same point, so a larger image grows outward
-  rather than shifting. Splat size and the drop shadow are applied to your art too.
+  rather than shifting. The drop shadow is built from your art too.
 - **New files are picked up when the art reloads** - toggling **Use resource packs** off and on is
   the quickest way, and it tells you in chat how many sprites it picked up.
 - **Switch the lot off** with **Use resource packs** without moving your files anywhere.

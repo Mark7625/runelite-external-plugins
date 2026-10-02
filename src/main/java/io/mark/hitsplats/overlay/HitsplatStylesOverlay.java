@@ -52,19 +52,18 @@ public class HitsplatStylesOverlay extends Overlay
 	private static final int DISPLAY_CYCLES = 70;
 	private static final int NATIVE_SPLAT_TOP = -12;
 	private static final int NATIVE_SPLAT_PAD = 1;
-	private static final int DAMAGE_BASELINE = 15;
-	private static final int HEAL_BASELINE = 3;
-	private static final int HEAL_BASELINE_2010 = 1;
+	private static final int DAMAGE_BASELINE = 17;
+	private static final int HEAL_BASELINE = 1;
+	private static final int HEAL_BASELINE_2010 = -1;
 	private static int hitBaseline(HitsplatStyle style)
 	{
 		switch (style)
 		{
 			case STYLE_2002:
-				return 2;
 			case STYLE_2011:
-				return 3;
-			default:
 				return 1;
+			default:
+				return 0;
 		}
 	}
 
@@ -73,10 +72,6 @@ public class HitsplatStylesOverlay extends Overlay
 		return value * sizePercent / 100;
 	}
 
-	private int sizeOf(StyleProperties properties, int splatSize)
-	{
-		return properties.getSize() * splatSize / 100;
-	}
 
 
 	private static final int FLOAT_DISTANCE = 12;
@@ -117,7 +112,7 @@ public class HitsplatStylesOverlay extends Overlay
 		HitsplatStyle blockStyle = style == HitsplatStyle.OSRS ? config.blockArt().getStyle() : null;
 		Frame frame = new Frame(client.getGameCycle(), style, blockStyle, config.tint(),
 			config.hideBlockedDamage(), config.hideBlockedIcon(), config.iconSet(), config.styleIconGap(),
-			config.splatSize(), config.fadeOut() ? config.fadeLength() : 0, config.healSplatMode().isItem());
+			config.fadeOut() ? config.fadeLength() : 0, config.healSplatMode().isItem());
 
 		Font font = graphics.getFont();
 		Composite composite = graphics.getComposite();
@@ -230,7 +225,7 @@ public class HitsplatStylesOverlay extends Overlay
 		alpha = Math.max(0, Math.min(255, alpha));
 
 		StyleProperties properties = sprites.getProperties(frame.style);
-		int size = sizeOf(properties, frame.splatSize);
+		int size = properties.getSize();
 		int splatX = anchor.getX() + offsetX - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
 		int top = anchor.getY() + offsetY + scaled(NATIVE_SPLAT_TOP, size) + animationY;
 		int centerY = top + image.getHeight() / 2;
@@ -329,7 +324,7 @@ public class HitsplatStylesOverlay extends Overlay
 		alpha = Math.max(0, Math.min(255, alpha));
 
 		StyleProperties properties = sprites.getProperties(style);
-		int size = sizeOf(properties, frame.splatSize);
+		int size = properties.getSize();
 		int slot = Math.min(splat.getSlot() << 1, SLOT_OFFSET.length - 2);
 		int splatX = anchor.getX() + SLOT_OFFSET[slot] - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
 		int top = anchor.getY() + SLOT_OFFSET[slot | 1] + scaled(NATIVE_SPLAT_TOP, size) + animationY;
@@ -500,12 +495,11 @@ public class HitsplatStylesOverlay extends Overlay
 		private final boolean hideBlockedIcon;
 		private final HitsplatIconSet iconSet;
 		private final int styleIconGap;
-		private final int splatSize;
 		private final int fadeLength;
 		private final boolean healItem;
 		private FontMetrics fontMetrics;
 
-		private Frame(int cycle, HitsplatStyle style, HitsplatStyle blockStyle, HitsplatTint tint, boolean hideBlockedDamage, boolean hideBlockedIcon, HitsplatIconSet iconSet, int styleIconGap, int splatSize, int fadeLength, boolean healItem)
+		private Frame(int cycle, HitsplatStyle style, HitsplatStyle blockStyle, HitsplatTint tint, boolean hideBlockedDamage, boolean hideBlockedIcon, HitsplatIconSet iconSet, int styleIconGap, int fadeLength, boolean healItem)
 		{
 			this.cycle = cycle;
 			this.style = style;
@@ -515,7 +509,6 @@ public class HitsplatStylesOverlay extends Overlay
 			this.hideBlockedIcon = hideBlockedIcon;
 			this.iconSet = iconSet;
 			this.styleIconGap = styleIconGap;
-			this.splatSize = splatSize;
 			this.fadeLength = fadeLength;
 			this.healItem = healItem;
 		}

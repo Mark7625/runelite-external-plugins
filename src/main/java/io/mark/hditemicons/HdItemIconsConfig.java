@@ -57,22 +57,10 @@ public interface HdItemIconsConfig extends Config {
 	}
 
 	@ConfigItem(
-		keyName = "hideDraggedItemIcon",
-		name = "Hide dragged item icon",
-		description = "While an item with a custom rotation is being dragged, blank the game's own icon for it, which"
-			+ " the client otherwise draws over ours. Does this by emptying the item's model, so turn it off if it"
-			+ " upsets another plugin.",
-		position = 4
-	)
-	default boolean hideDraggedItemIcon() {
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "editRotationHotkey",
 		name = "Edit icon rotation hotkey",
 		description = "Hold this while right-clicking an item to add an \"Edit icon rotation\" option to its menu.",
-		position = 5
+		position = 4
 	)
 	default Keybind editRotationHotkey() {
 		return Keybind.SHIFT;

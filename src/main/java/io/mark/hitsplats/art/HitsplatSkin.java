@@ -15,8 +15,8 @@ public enum HitsplatSkin
 	VENOM_TINTED("venom_tinted", "venom_normal"),
 	DISEASE("disease_normal"),
 	DISEASE_TINTED("disease_tinted", "disease_normal"),
-	HEAL("heal_normal", "poison_normal"),
-	HEAL_TINTED("heal_tinted", "heal_normal", "poison_tinted", "poison_normal"),
+	HEAL("heal_normal", "heal", "poison_normal"),
+	HEAL_TINTED("heal_tinted", "heal_normal", "heal", "poison_tinted", "poison_normal"),
 	CYAN("damage_cyan_normal", "damage_normal"),
 	CYAN_TINTED("damage_cyan_tinted", "damage_cyan_normal", "damage_tinted", "damage_normal"),
 	CYAN_MAX("damage_cyan_max", "damage_max", "damage_cyan_normal", "damage_normal"),
@@ -33,12 +33,15 @@ public enum HitsplatSkin
 	POISE_TINTED("damage_poise_tinted", "damage_poise_normal", "damage_tinted", "damage_normal"),
 	POISE_MAX("damage_poise_max", "damage_max", "damage_poise_normal", "damage_normal"),
 	PRAYER_DRAIN("prayer_drain_normal", "damage_normal"),
-	BLEED("bleed_normal", "damage_normal"),
-	BURN("burn_normal", "poison_normal", "damage_normal"),
+	BLEED("bleed_normal", "bleed", "damage_normal"),
+	BURN("burn_normal", "burn", "poison_normal", "damage_normal"),
 	CORRUPTION("corruption_normal", "damage_normal"),
 	DOOM("doom_normal", "damage_normal"),
 	SANITY_DRAIN("sanity_drain_normal", "damage_normal"),
 	SANITY_RESTORE("sanity_restore_normal", "heal_normal", "poison_normal");
+
+	public static final int DAMAGE_MAX_SHORT = 77;
+	public static final int DAMAGE_SHORT = 82;
 
 	private final String[] fileNames;
 
@@ -134,6 +137,11 @@ public enum HitsplatSkin
 			case HitsplatID.VENOM:
 			case HitsplatID.DISEASE:
 			case HitsplatID.DISEASE_BLOCKED:
+			case HitsplatID.DAMAGE_MAX_ME_CYAN:
+			case HitsplatID.BLEED:
+			case HitsplatID.BURN:
+			case DAMAGE_MAX_SHORT:
+			case DAMAGE_SHORT:
 				return true;
 			default:
 				return false;
@@ -148,6 +156,10 @@ public enum HitsplatSkin
 				return DAMAGE;
 			case HitsplatID.DAMAGE_MAX_ME:
 				return DAMAGE_MAX;
+			case DAMAGE_SHORT:
+				return DAMAGE;
+			case DAMAGE_MAX_SHORT:
+				return CYAN_MAX;
 			case HitsplatID.BLOCK_ME:
 				return BLOCK;
 			case HitsplatID.BLOCK_OTHER:

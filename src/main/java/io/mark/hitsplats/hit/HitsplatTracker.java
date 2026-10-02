@@ -16,7 +16,7 @@ public class HitsplatTracker
 
 	private final Map<Actor, List<TrackedHitsplat>> tracked = new HashMap<>();
 
-	public void add(Actor actor, int cycle, int endCycle, HitsplatSkin skin, CombatStyle combatStyle, String text, boolean block)
+	public int add(Actor actor, int cycle, int endCycle, HitsplatSkin skin, CombatStyle combatStyle, String text, boolean block)
 	{
 		List<TrackedHitsplat> splats = tracked.computeIfAbsent(actor, a -> new ArrayList<>(MAX_SLOTS));
 
@@ -71,10 +71,32 @@ public class HitsplatTracker
 
 		if (slot < 0)
 		{
-			return;
+			return -1;
 		}
 
 		splats.set(slot, new TrackedHitsplat(slot, endCycle, skin, combatStyle, text, block));
+		return slot;
+	}
+
+	public int busySlots(Actor actor, int cycle, int fadeLength)
+	{
+		List<TrackedHitsplat> splats = tracked.get(actor);
+		if (splats == null)
+		{
+			return 0;
+		}
+
+		int mask = 0;
+		for (int i = 0; i < splats.size(); i++)
+		{
+			TrackedHitsplat splat = splats.get(i);
+			if (splat != null && splat.getEndCycle() + fadeLength > cycle)
+			{
+				mask |= 1 << splat.getSlot();
+			}
+		}
+
+		return mask;
 	}
 
 	public void remove(Actor actor)

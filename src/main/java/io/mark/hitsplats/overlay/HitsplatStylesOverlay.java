@@ -8,6 +8,8 @@ import io.mark.hitsplats.combat.CombatStyle;
 import io.mark.hitsplats.config.HitsplatIconSet;
 import io.mark.hitsplats.config.HitsplatStylesConfig;
 import io.mark.hitsplats.config.HitsplatTint;
+import io.mark.hitsplats.heal.HealSplat;
+import io.mark.hitsplats.heal.HealTracker;
 import io.mark.hitsplats.hit.HitsplatTracker;
 import io.mark.hitsplats.hit.TrackedHitsplat;
 import java.awt.AlphaComposite;
@@ -27,9 +29,11 @@ import net.runelite.api.Client;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Perspective;
+import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -39,30 +43,61 @@ public class HitsplatStylesOverlay extends Overlay
 {
 	private static final int[] SLOT_OFFSET = {0, 0, 0, -20, -15, -10, 15, -10, 15, 10, 0, 20, -15, 10, -30, -10};
 
-	private static final int ICON_GAP = 4;
+	private static final int HEAL_BELOW_X = 0;
+	private static final int HEAL_BELOW_Y = 24;
+
+	private static final int ITEM_ICON_GAP = 4;
 
 	private static final int DISPLAY_CYCLES = 70;
 	private static final int NATIVE_SPLAT_TOP = -12;
 	private static final int NATIVE_SPLAT_PAD = 1;
 	private static final int DAMAGE_BASELINE = 15;
+	private static final int HEAL_BASELINE = 3;
+	private static final int HEAL_BASELINE_2010 = 1;
+	private static int hitBaseline(HitsplatStyle style)
+	{
+		switch (style)
+		{
+			case STYLE_2002:
+				return 2;
+			case STYLE_2011:
+				return 3;
+			default:
+				return 1;
+		}
+	}
+
+	private static int scaled(int value, int sizePercent)
+	{
+		return value * sizePercent / 100;
+	}
+
+	private static int sizeOf(HitsplatStyle style, int splatSize)
+	{
+		return style.getScale() * splatSize / 100;
+	}
 
 
 	private static final int FLOAT_DISTANCE = 12;
 
 	private final Client client;
 	private final HitsplatTracker tracker;
+	private final HealTracker healTracker;
 	private final HitsplatStylesConfig config;
 	private final HitsplatSprites sprites;
 	private final NpcHeights npcHeights;
+	private final ItemManager itemManager;
 
 	@Inject
-	private HitsplatStylesOverlay(Client client, HitsplatTracker tracker, HitsplatStylesConfig config, HitsplatSprites sprites, NpcHeights npcHeights)
+	private HitsplatStylesOverlay(Client client, HitsplatTracker tracker, HealTracker healTracker, HitsplatStylesConfig config, HitsplatSprites sprites, NpcHeights npcHeights, ItemManager itemManager)
 	{
 		this.client = client;
 		this.tracker = tracker;
+		this.healTracker = healTracker;
 		this.config = config;
 		this.sprites = sprites;
 		this.npcHeights = npcHeights;
+		this.itemManager = itemManager;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.UNDER_WIDGETS);
 	}
@@ -71,7 +106,8 @@ public class HitsplatStylesOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		Map<Actor, List<TrackedHitsplat>> tracked = tracker.getTracked();
-		if (tracked.isEmpty())
+		boolean healSplats = !healTracker.isEmpty();
+		if (tracked.isEmpty() && !healSplats)
 		{
 			return null;
 		}
@@ -79,8 +115,8 @@ public class HitsplatStylesOverlay extends Overlay
 		HitsplatStyle style = config.style();
 		HitsplatStyle blockStyle = style == HitsplatStyle.OSRS ? config.blockArt().getStyle() : null;
 		Frame frame = new Frame(client.getGameCycle(), style, blockStyle, config.tint(),
-			config.hideBlockedDamage(), config.hideBlockedIcon(), config.iconSet(), config.shadows(),
-			config.fadeOut() ? config.fadeLength() : 0);
+			config.hideBlockedDamage(), config.hideBlockedIcon(), config.iconSet(), config.styleIconGap(),
+			config.splatSize(), config.fadeOut() ? config.fadeLength() : 0, config.healSplatMode().isItem());
 
 		Font font = graphics.getFont();
 		Composite composite = graphics.getComposite();
@@ -120,9 +156,118 @@ public class HitsplatStylesOverlay extends Overlay
 			}
 		}
 
+		if (healSplats && !HitsplatStylesPlugin.DEBUG_SLOTS)
+		{
+			renderHealSplats(graphics, frame);
+		}
+
 		graphics.setFont(font);
 		graphics.setComposite(composite);
 		return null;
+	}
+
+	private void renderHealSplats(Graphics2D graphics, Frame frame)
+	{
+		healTracker.prune(frame.cycle - frame.fadeLength);
+
+		HealSplat[] positions = healTracker.getPositions();
+		Point anchor = null;
+
+		for (HealSplat splat : positions)
+		{
+			if (splat == null)
+			{
+				continue;
+			}
+
+			if (anchor == null)
+			{
+				Player local = client.getLocalPlayer();
+				anchor = local == null ? null : anchor(local);
+				if (anchor == null)
+				{
+					return;
+				}
+			}
+
+			renderHealSplat(graphics, anchor, splat, frame);
+		}
+	}
+
+	private void renderHealSplat(Graphics2D graphics, Point anchor, HealSplat splat, Frame frame)
+	{
+		BufferedImage image = sprites.get(frame.style, HitsplatSkin.HEAL);
+		if (image == null)
+		{
+			return;
+		}
+
+		int position = splat.getPosition();
+		int offsetX;
+		int offsetY;
+		if (position == HealTracker.BELOW_POSITION)
+		{
+			offsetX = HEAL_BELOW_X;
+			offsetY = HEAL_BELOW_Y;
+		}
+		else
+		{
+			offsetX = SLOT_OFFSET[position << 1];
+			offsetY = SLOT_OFFSET[(position << 1) | 1];
+		}
+
+		int overrun = frame.cycle - splat.getEndCycle();
+
+		int animationY = 0;
+		int alpha = 255;
+		if (overrun >= 0 && frame.fadeLength > 0)
+		{
+			animationY = -(FLOAT_DISTANCE * overrun / frame.fadeLength);
+			alpha = ((frame.fadeLength - overrun) << 8) / frame.fadeLength;
+		}
+
+		alpha = Math.max(0, Math.min(255, alpha));
+
+		int size = sizeOf(frame.style, frame.splatSize);
+		int splatX = anchor.getX() + offsetX - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
+		int top = anchor.getY() + offsetY + scaled(NATIVE_SPLAT_TOP, size) + animationY;
+		int centerY = top + image.getHeight() / 2;
+
+		graphics.setComposite(alpha >= 255
+			? AlphaComposite.SrcOver
+			: AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
+
+		BufferedImage splatShadow = frame.style.isShadowed() ? sprites.getShadow(frame.style, HitsplatSkin.HEAL) : null;
+		if (splatShadow != null)
+		{
+			graphics.drawImage(splatShadow,
+				splatX - (splatShadow.getWidth() - image.getWidth()) / 2,
+				top - (splatShadow.getHeight() - image.getHeight()) / 2,
+				null);
+		}
+
+		graphics.drawImage(image, splatX, top, null);
+
+		if (frame.healItem && splat.getItemId() > 0)
+		{
+			BufferedImage item = itemManager.getImage(splat.getItemId());
+			if (item != null && item.getWidth() > 0 && item.getHeight() > 0)
+			{
+				int height = image.getHeight();
+				int width = Math.max(1, item.getWidth() * height / item.getHeight());
+				graphics.drawImage(item, splatX - ITEM_ICON_GAP - width, centerY - height / 2, width, height, null);
+			}
+		}
+
+		String text = splat.getText();
+		int textX = splatX + (image.getWidth() - frame.fontMetrics.stringWidth(text)) / 2;
+		int textY = top + scaled(DAMAGE_BASELINE, size) + frame.style.getTextOffsetY()
+			+ (frame.style == HitsplatStyle.STYLE_2010 ? HEAL_BASELINE_2010 : HEAL_BASELINE);
+
+		graphics.setColor(Color.BLACK);
+		graphics.drawString(text, textX + 1, textY);
+		graphics.setColor(Color.WHITE);
+		graphics.drawString(text, textX, textY);
 	}
 
 	private void renderHitsplat(Graphics2D graphics, Actor actor, TrackedHitsplat splat, Frame frame)
@@ -181,16 +326,17 @@ public class HitsplatStylesOverlay extends Overlay
 
 		alpha = Math.max(0, Math.min(255, alpha));
 
+		int size = sizeOf(style, frame.splatSize);
 		int slot = Math.min(splat.getSlot() << 1, SLOT_OFFSET.length - 2);
 		int splatX = anchor.getX() + SLOT_OFFSET[slot] - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
-		int top = anchor.getY() + SLOT_OFFSET[slot | 1] + NATIVE_SPLAT_TOP + animationY;
+		int top = anchor.getY() + SLOT_OFFSET[slot | 1] + scaled(NATIVE_SPLAT_TOP, size) + animationY;
 		int centerY = top + image.getHeight() / 2;
 
 		graphics.setComposite(alpha >= 255
 			? AlphaComposite.SrcOver
 			: AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
 
-		BufferedImage splatShadow = frame.shadows && style.isShadowed() ? sprites.getShadow(style, skin) : null;
+		BufferedImage splatShadow = style.isShadowed() ? sprites.getShadow(style, skin) : null;
 		if (splatShadow != null)
 		{
 			graphics.drawImage(splatShadow,
@@ -203,12 +349,12 @@ public class HitsplatStylesOverlay extends Overlay
 
 		if (icon != null)
 		{
-			int slotRight = splatX - ICON_GAP;
+			int slotRight = splatX - frame.styleIconGap;
 			int slotCenterX = slotRight - sprites.getIconSlotWidth(frame.iconSet) / 2;
 			int iconX = slotCenterX - icon.getWidth() / 2;
 			int iconY = centerY - icon.getHeight() / 2;
 
-			BufferedImage shadow = frame.shadows ? sprites.getIconShadow(frame.iconSet, iconStyle) : null;
+			BufferedImage shadow = sprites.getIconShadow(frame.iconSet, iconStyle);
 			if (shadow != null)
 			{
 				graphics.drawImage(shadow,
@@ -223,12 +369,12 @@ public class HitsplatStylesOverlay extends Overlay
 		if (!(frame.hideBlockedDamage && splat.isBlock()))
 		{
 			int textX = splatX + (image.getWidth() - frame.fontMetrics.stringWidth(text)) / 2;
-			int textY = top + DAMAGE_BASELINE + style.getTextOffsetY();
+			int textY = top + scaled(DAMAGE_BASELINE, size) + style.getTextOffsetY() + hitBaseline(style);
 
 			graphics.setColor(Color.BLACK);
-			graphics.drawString(text, textX + 1, textY + 3);
+			graphics.drawString(text, textX + 1, textY);
 			graphics.setColor(Color.WHITE);
-			graphics.drawString(text, textX, textY + 3);
+			graphics.drawString(text, textX, textY);
 		}
 	}
 
@@ -350,11 +496,13 @@ public class HitsplatStylesOverlay extends Overlay
 		private final boolean hideBlockedDamage;
 		private final boolean hideBlockedIcon;
 		private final HitsplatIconSet iconSet;
-		private final boolean shadows;
+		private final int styleIconGap;
+		private final int splatSize;
 		private final int fadeLength;
+		private final boolean healItem;
 		private FontMetrics fontMetrics;
 
-		private Frame(int cycle, HitsplatStyle style, HitsplatStyle blockStyle, HitsplatTint tint, boolean hideBlockedDamage, boolean hideBlockedIcon, HitsplatIconSet iconSet, boolean shadows, int fadeLength)
+		private Frame(int cycle, HitsplatStyle style, HitsplatStyle blockStyle, HitsplatTint tint, boolean hideBlockedDamage, boolean hideBlockedIcon, HitsplatIconSet iconSet, int styleIconGap, int splatSize, int fadeLength, boolean healItem)
 		{
 			this.cycle = cycle;
 			this.style = style;
@@ -363,8 +511,10 @@ public class HitsplatStylesOverlay extends Overlay
 			this.hideBlockedDamage = hideBlockedDamage;
 			this.hideBlockedIcon = hideBlockedIcon;
 			this.iconSet = iconSet;
-			this.shadows = shadows;
+			this.styleIconGap = styleIconGap;
+			this.splatSize = splatSize;
 			this.fadeLength = fadeLength;
+			this.healItem = healItem;
 		}
 	}
 }

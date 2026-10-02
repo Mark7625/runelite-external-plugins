@@ -2,6 +2,8 @@ package io.mark.hitsplats.art;
 
 import io.mark.hitsplats.combat.CombatStyle;
 import io.mark.hitsplats.config.HitsplatIconSet;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -21,7 +23,6 @@ public class HitsplatSprites
 
 	private static final String RESOURCE_ROOT = "/io/mark/hitsplats/";
 	private static final String ICON_DIRECTORY = "style_icons";
-	private static final int SHADOW_RADIUS = 2;
 	private static final int SHADOW_ALPHA = 120;
 
 	private volatile Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> packs;
@@ -36,7 +37,7 @@ public class HitsplatSprites
 		this.executor = executor;
 	}
 
-	public void load()
+	public void load(int shadowRadius, int scalePercent)
 	{
 		executor.execute(() ->
 		{
@@ -44,9 +45,9 @@ public class HitsplatSprites
 			Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> loadedShadows = new EnumMap<>(HitsplatStyle.class);
 			for (HitsplatStyle style : HitsplatStyle.values())
 			{
-				Map<HitsplatSkin, BufferedImage> pack = loadPack(style);
+				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, style.getScale() * scalePercent / 100);
 				loaded.put(style, pack);
-				loadedShadows.put(style, outlinePack(pack));
+				loadedShadows.put(style, outlinePack(pack, shadowRadius));
 			}
 
 			Map<HitsplatIconSet, Map<CombatStyle, BufferedImage>> loadedIcons = new EnumMap<>(HitsplatIconSet.class);
@@ -61,7 +62,11 @@ public class HitsplatSprites
 
 				for (Map.Entry<CombatStyle, BufferedImage> entry : setIcons.entrySet())
 				{
-					shadows.put(entry.getKey(), outline(entry.getValue(), SHADOW_RADIUS, SHADOW_ALPHA));
+					if (shadowRadius > 0)
+					{
+						shadows.put(entry.getKey(), outline(entry.getValue(), shadowRadius, SHADOW_ALPHA));
+					}
+
 					widest = Math.max(widest, entry.getValue().getWidth());
 				}
 
@@ -111,16 +116,21 @@ public class HitsplatSprites
 		return pack == null ? null : pack.get(skin);
 	}
 
-	private static Map<HitsplatSkin, BufferedImage> outlinePack(Map<HitsplatSkin, BufferedImage> pack)
+	private static Map<HitsplatSkin, BufferedImage> outlinePack(Map<HitsplatSkin, BufferedImage> pack, int shadowRadius)
 	{
 		Map<HitsplatSkin, BufferedImage> shadows = new EnumMap<>(HitsplatSkin.class);
+		if (shadowRadius <= 0)
+		{
+			return shadows;
+		}
+
 		// Skins share images through their fallback chains, so outline each distinct one once.
 		Map<BufferedImage, BufferedImage> byImage = new IdentityHashMap<>();
 
 		for (Map.Entry<HitsplatSkin, BufferedImage> entry : pack.entrySet())
 		{
 			shadows.put(entry.getKey(), byImage.computeIfAbsent(entry.getValue(),
-				image -> outline(image, SHADOW_RADIUS, SHADOW_ALPHA)));
+				image -> outline(image, shadowRadius, SHADOW_ALPHA)));
 		}
 
 		return shadows;
@@ -176,7 +186,7 @@ public class HitsplatSprites
 		return pack;
 	}
 
-	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style)
+	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style, int scalePercent)
 	{
 		Map<HitsplatSkin, BufferedImage> pack = new EnumMap<>(HitsplatSkin.class);
 		Map<String, BufferedImage> byFileName = new HashMap<>();
@@ -192,7 +202,7 @@ public class HitsplatSprites
 				}
 				else
 				{
-					image = loadImage(style.getDirectory(), fileName);
+					image = scale(loadImage(style.getDirectory(), fileName), scalePercent);
 					byFileName.put(fileName, image);
 				}
 
@@ -252,6 +262,25 @@ public class HitsplatSprites
 				out.setRGB(index % width, index / width, alpha[index] << 24);
 			}
 		}
+
+		return out;
+	}
+
+	private static BufferedImage scale(BufferedImage image, int percent)
+	{
+		if (image == null || percent == 100)
+		{
+			return image;
+		}
+
+		int width = Math.max(1, image.getWidth() * percent / 100);
+		int height = Math.max(1, image.getHeight() * percent / 100);
+
+		BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D graphics = out.createGraphics();
+		graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+		graphics.drawImage(image, 0, 0, width, height, null);
+		graphics.dispose();
 
 		return out;
 	}

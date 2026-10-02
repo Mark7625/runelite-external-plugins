@@ -3,6 +3,7 @@ package io.mark.hditemicons;
 import lombok.Getter;
 
 public enum IconQuality {
+	NONE(1, "No antialiasing"),
 	LOW(2, "Low"),
 	MEDIUM(4, "Medium"),
 	HIGH(6, "High");

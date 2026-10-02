@@ -131,9 +131,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 		final long fingerprint;
 		int resolvedModelItemId = -1;
 
-		ReferenceIcon(int itemId, int borderWidth, int quality, int[] plainPixels, int[] pixelsWithCount) {
+		ReferenceIcon(int itemId, int borderWidth, int supersample, int[] plainPixels, int[] pixelsWithCount) {
 			this.plainPixels = plainPixels;
-			this.fingerprint = fingerprintOf(itemId, borderWidth, quality, plainPixels);
+			this.fingerprint = fingerprintOf(itemId, borderWidth, supersample, plainPixels);
 
 			for (int y = 0; y < ICON_HEIGHT; y++) {
 				for (int x = 0; x < ICON_WIDTH; x++) {
@@ -163,11 +163,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 			return (patchFlags[patch] & flag) != 0;
 		}
 
-		private static long fingerprintOf(int itemId, int borderWidth, int quality, int[] pixels) {
+		// Keyed on the quality's supersampling rather than the setting itself, so the key of an
+		// already-rendered icon doesn't move when a quality is added to the setting
+		private static long fingerprintOf(int itemId, int borderWidth, int supersample, int[] pixels) {
 			long h = 0xCBF29CE484222325L; // FNV-1a
 			h = mix(h, itemId);
 			h = mix(h, borderWidth);
-			h = mix(h, quality);
+			h = mix(h, supersample);
 			for (int p : pixels)
 				h = mix(h, p);
 			return h;
@@ -1027,7 +1029,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		int[] withCount = plain == null || quantityMode == ItemQuantityMode.NEVER ? plain :
 			fetchGamePixels(itemId, quantity, borderWidth, quantityMode, false);
 		if (withCount != null)
-			reference = new ReferenceIcon(itemId, borderWidth, config.iconQuality().ordinal(), plain, withCount);
+			reference = new ReferenceIcon(itemId, borderWidth, config.iconQuality().getSupersample(), plain, withCount);
 		referenceIcons.put(key, reference);
 		return reference;
 	}

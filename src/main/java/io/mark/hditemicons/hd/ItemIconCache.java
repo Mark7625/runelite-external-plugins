@@ -26,8 +26,8 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
  */
 @Slf4j
 class ItemIconCache {
-	// Bump when icons are drawn differently
-	private static final int VERSION = 3;
+	// Bump when icons are drawn differently, or keyed differently
+	private static final int VERSION = 4;
 	private static final int MAX_FOLDERS = 3;
 
 	private final Filepath folder;

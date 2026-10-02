@@ -26,7 +26,8 @@ public interface HdItemIconsConfig extends Config {
 		keyName = "iconQuality",
 		name = "Icon quality",
 		description = "Controls how much antialiasing supersampling is used when rendering icons."
-			+ " Higher quality looks smoother but takes longer to render each icon.",
+			+ " Higher quality looks smoother but takes longer to render each icon. No antialiasing"
+			+ " renders fastest, with hard edges and thin parts of a model likely to be left out.",
 		position = 1
 	)
 	default IconQuality iconQuality() {

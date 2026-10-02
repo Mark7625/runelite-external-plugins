@@ -61,7 +61,7 @@ public class HitsplatSprites
 				StyleProperties properties = overrideRoot.loadProperties(style);
 				loadedProperties.put(style, properties);
 
-				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, properties.getSize(), overrideRoot);
+				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, properties, overrideRoot);
 				loaded.put(style, pack);
 				loadedShadows.put(style, outlinePack(pack, shadowRadius, properties));
 			}
@@ -214,7 +214,8 @@ public class HitsplatSprites
 		return pack;
 	}
 
-	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style, int scalePercent, Overrides overrideRoot)
+	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style, StyleProperties properties,
+		Overrides overrideRoot)
 	{
 		Map<HitsplatSkin, BufferedImage> pack = new EnumMap<>(HitsplatSkin.class);
 		Map<String, BufferedImage> byFileName = new HashMap<>();
@@ -230,7 +231,7 @@ public class HitsplatSprites
 				}
 				else
 				{
-					image = scale(loadImage(overrideRoot, style.getDirectory(), fileName), scalePercent);
+					image = loadSkin(style, properties, overrideRoot, fileName);
 					byFileName.put(fileName, image);
 				}
 
@@ -467,14 +468,27 @@ public class HitsplatSprites
 		return path;
 	}
 
+	private static BufferedImage loadSkin(HitsplatStyle style, StyleProperties properties, Overrides overrideRoot,
+		String fileName)
+	{
+		BufferedImage override = overrideRoot.load(style.getDirectory(), fileName);
+		if (override != null)
+		{
+			// A pack that turns this on has drawn its art at the size it wants it, so leave it exactly as it is.
+			return properties.isDisableSplatIconScale() ? override : scale(override, properties.getSize());
+		}
+
+		return scale(loadResource(style.getDirectory(), fileName), properties.getSize());
+	}
+
 	private static BufferedImage loadImage(Overrides overrideRoot, String directory, String fileName)
 	{
 		BufferedImage override = overrideRoot.load(directory, fileName);
-		if (override != null)
-		{
-			return override;
-		}
+		return override != null ? override : loadResource(directory, fileName);
+	}
 
+	private static BufferedImage loadResource(String directory, String fileName)
+	{
 		String path = RESOURCE_ROOT + directory + "/" + fileName + ".png";
 		if (HitsplatSprites.class.getResource(path) == null)
 		{

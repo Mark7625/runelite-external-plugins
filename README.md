@@ -90,6 +90,7 @@ plugin's own value.
 
 ```properties
 size=120
+disableSplatIconScale=true
 textColor=#FFFF00
 textShadowColor=#000000
 shadowColor=#000000
@@ -100,6 +101,7 @@ textOffsetY=0
 | Key | What it does |
 | --- | --- |
 | `size` | Scales this style's art, as a percentage. `200` stays perfectly pixel sharp; sizes in between are smoothed so the shape doesn't come out ragged |
+| `disableSplatIconScale` | `true` draws your own PNGs exactly as you saved them, with no scaling and no smoothing. Already on for OSRS and 2002, off for 2010 and 2011 |
 | `textColor` | Colour of the damage number |
 | `textShadowColor` | Colour of the drop shadow behind the number |
 | `shadowColor` | Colour of the soft outline behind the splat |

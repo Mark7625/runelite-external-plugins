@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1275,15 +1276,38 @@ public class HdItemIcons extends WidgetItemOverlay {
 		CustomRotation existing = rotationStorage.get(itemId);
 		CustomRotation initial = existing != null ? existing : defaults;
 		String name = item.getName();
+		List<RotationEditorDialog.Preset> presets = savedIconPresets(itemId);
+		int[] referencePixels = fetchGamePixels(itemId, 1, 0, ItemQuantityMode.NEVER, false);
 
 		SwingUtilities.invokeLater(() -> {
 			if (!active)
 				return;
-			RotationEditorDialog dialog = new RotationEditorDialog(name, itemId, initial, defaults,
-				iconModel, palette, supersample, rotationStorage, this::onRotationChanged);
+			RotationEditorDialog dialog = new RotationEditorDialog(name, itemId, initial, defaults, presets,
+				iconModel, referencePixels, palette, supersample, rotationStorage, this::onRotationChanged);
 			openRotationDialog = dialog;
 			dialog.setVisible(true);
 		});
+	}
+
+	/**
+	 * Every other item with a saved rotation, to be offered as presets to copy. Client thread
+	 * only, for the item names.
+	 */
+	private List<RotationEditorDialog.Preset> savedIconPresets(int editingItemId) {
+		List<RotationEditorDialog.Preset> presets = new ArrayList<>();
+		int itemCount = client.getItemCount();
+		for (Map.Entry<Integer, CustomRotation> saved : rotationStorage.all().entrySet()) {
+			int itemId = saved.getKey();
+			// A saved id can outlive the item, if the game's cache changed under it
+			if (itemId == editingItemId || itemId < 0 || itemId >= itemCount)
+				continue;
+			String name = client.getItemDefinition(itemId).getName();
+			if (name == null || name.isEmpty() || "null".equals(name))
+				name = "Item";
+			presets.add(new RotationEditorDialog.Preset(name + " (" + itemId + ")", saved.getValue()));
+		}
+		presets.sort(Comparator.comparing(Object::toString, String.CASE_INSENSITIVE_ORDER));
+		return presets;
 	}
 
 	private void onRotationChanged(int itemId) {

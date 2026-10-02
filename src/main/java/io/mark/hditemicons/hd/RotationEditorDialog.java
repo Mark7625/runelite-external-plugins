@@ -15,13 +15,16 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import javax.annotation.Nullable;
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -45,6 +48,26 @@ import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
 final class RotationEditorDialog extends JFrame {
 	private enum Mode { ROTATE, PAN, SCALE }
 
+	/**
+	 * One entry of the saved-icon dropdown, whose values can be copied onto the item being
+	 * edited. The prompt entry carries no rotation.
+	 */
+	static final class Preset {
+		private final String label;
+		@Nullable
+		private final CustomRotation rotation;
+
+		Preset(String label, @Nullable CustomRotation rotation) {
+			this.label = label;
+			this.rotation = rotation;
+		}
+
+		@Override
+		public String toString() {
+			return label;
+		}
+	}
+
 	private static final int PREVIEW_SCALE = 6;
 	private static final int COMMIT_THROTTLE_MS = 100;
 	private static final double ANGLE_PER_DRAG_PIXEL = 4;
@@ -54,6 +77,8 @@ final class RotationEditorDialog extends JFrame {
 
 	private final int itemId;
 	private final ItemIconRasterizer.IconModel model;
+	@Nullable
+	private final int[] referencePixels;
 	private final int[] palette;
 	private final int supersample;
 	private final CustomRotationStorage rotationStorage;
@@ -84,11 +109,13 @@ final class RotationEditorDialog extends JFrame {
 	private final JLabel hintLabel;
 
 	RotationEditorDialog(String itemName, int itemId, CustomRotation initial, CustomRotation defaults,
-						ItemIconRasterizer.IconModel model, int[] palette, int supersample,
+						List<Preset> presets, ItemIconRasterizer.IconModel model, @Nullable int[] referencePixels,
+						int[] palette, int supersample,
 						CustomRotationStorage rotationStorage, IntConsumer onChanged) {
 		super("Edit icon");
 		this.itemId = itemId;
 		this.model = model;
+		this.referencePixels = referencePixels;
 		this.palette = palette;
 		this.supersample = supersample;
 		this.rotationStorage = rotationStorage;
@@ -158,11 +185,33 @@ final class RotationEditorDialog extends JFrame {
 		fields.add(fieldRow("Resize Y", resizeYSpinner, () -> defaults.resizeY));
 		fields.add(fieldRow("Resize Z", resizeZSpinner, () -> defaults.resizeZ));
 
+		Preset prompt = new Preset(presets.isEmpty() ? "No other saved icons" : "Pick a saved icon...", null);
+		JComboBox<Preset> presetBox = new JComboBox<>();
+		presetBox.addItem(prompt);
+		for (Preset preset : presets)
+			presetBox.addItem(preset);
+		presetBox.setEnabled(!presets.isEmpty());
+		presetBox.addActionListener(e -> {
+			Preset picked = (Preset) presetBox.getSelectedItem();
+			if (picked == null || picked.rotation == null)
+				return;
+			applyImmediately(() -> applyToSpinners(picked.rotation));
+			// Back to the prompt, since this copies values rather than staying set to one
+			presetBox.setSelectedItem(prompt);
+		});
+
+		JPanel presetRow = new JPanel(new BorderLayout(4, 0));
+		JLabel presetLabel = new JLabel("Copy from");
+		presetLabel.setPreferredSize(new Dimension(60, presetLabel.getPreferredSize().height));
+		presetRow.add(presetLabel, BorderLayout.WEST);
+		presetRow.add(presetBox, BorderLayout.CENTER);
+
 		JButton resetAll = new JButton("Reset to default");
-		resetAll.addActionListener(e -> applyImmediately(() -> {
-			rotationStorage.remove(itemId);
-			applyToSpinners(defaults);
-		}));
+		resetAll.addActionListener(e -> applyImmediately(() -> applyToSpinners(defaults)));
+
+		JPanel bottom = new JPanel(new BorderLayout(0, 8));
+		bottom.add(presetRow, BorderLayout.NORTH);
+		bottom.add(resetAll, BorderLayout.SOUTH);
 
 		JPanel top = new JPanel(new BorderLayout(4, 4));
 		top.add(subtitle, BorderLayout.NORTH);
@@ -176,7 +225,7 @@ final class RotationEditorDialog extends JFrame {
 		content.setBorder(new EmptyBorder(10, 10, 10, 10));
 		content.add(top, BorderLayout.NORTH);
 		content.add(fields, BorderLayout.CENTER);
-		content.add(resetAll, BorderLayout.SOUTH);
+		content.add(bottom, BorderLayout.SOUTH);
 		setContentPane(content);
 
 		pack();
@@ -336,12 +385,19 @@ final class RotationEditorDialog extends JFrame {
 	}
 
 	private void commit() {
-		rotationStorage.put(itemId, currentRotation());
+		CustomRotation rotation = currentRotation();
+		// Having no override at all is what being at the defaults means: the icon goes back to
+		// being fitted to the game's own, rather than placed from these values
+		if (rotation.equals(defaults))
+			rotationStorage.remove(itemId);
+		else
+			rotationStorage.put(itemId, rotation);
 		onChanged.accept(itemId);
 	}
 
 	private void schedulePreview() {
 		CustomRotation rotation = currentRotation();
+		boolean atDefaults = rotation.equals(defaults);
 		long generation = ++previewGeneration;
 		previewExecutor.execute(() -> {
 			// Skip stale work rather than letting a burst of changes queue up behind rendering
@@ -349,7 +405,12 @@ final class RotationEditorDialog extends JFrame {
 				return;
 			ItemIconRasterizer rasterizer = new ItemIconRasterizer(model, rotation.xan2d, rotation.yan2d, rotation.zan2d,
 				rotation.resizeX, rotation.resizeY, rotation.resizeZ, supersample);
-			rasterizer.placeExplicitly(rotation.zoom2d, rotation.offsetX, rotation.offsetY);
+			// At the defaults the icon itself is fitted to the game's own, so the preview is too,
+			// or the two would disagree on what the default even looks like
+			boolean fitted = atDefaults && referencePixels != null
+				&& rasterizer.fitToReferenceSilhouette(referencePixels, palette);
+			if (!fitted)
+				rasterizer.placeExplicitly(rotation.zoom2d, rotation.offsetX, rotation.offsetY);
 			// Unsharpened: this preview is magnified, not stretched by the interface
 			int[] pixels = rasterizer.render(0, false, false, palette);
 			SwingUtilities.invokeLater(() -> {

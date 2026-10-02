@@ -93,6 +93,10 @@ public class CustomRotationStorage {
 		return rotations.get(itemId);
 	}
 
+	public Map<Integer, CustomRotation> all() {
+		return Map.copyOf(rotations);
+	}
+
 	public void put(int itemId, CustomRotation rotation) {
 		rotations.put(itemId, rotation);
 		persist();

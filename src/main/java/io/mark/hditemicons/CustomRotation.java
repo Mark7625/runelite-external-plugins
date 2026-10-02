@@ -1,5 +1,7 @@
 package io.mark.hditemicons;
 
+import java.util.Objects;
+
 /**
  * An override for an item's icon camera placement, named after the item definition fields it
  * stands in for. Angles are in Jau (0-2047 per turn), resize is out of 128.
@@ -26,5 +28,22 @@ public final class CustomRotation {
 		this.resizeX = resizeX;
 		this.resizeY = resizeY;
 		this.resizeZ = resizeZ;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (this == other)
+			return true;
+		if (!(other instanceof CustomRotation))
+			return false;
+		CustomRotation that = (CustomRotation) other;
+		return xan2d == that.xan2d && yan2d == that.yan2d && zan2d == that.zan2d && zoom2d == that.zoom2d
+			&& offsetX == that.offsetX && offsetY == that.offsetY
+			&& resizeX == that.resizeX && resizeY == that.resizeY && resizeZ == that.resizeZ;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(xan2d, yan2d, zan2d, zoom2d, offsetX, offsetY, resizeX, resizeY, resizeZ);
 	}
 }

@@ -37,6 +37,7 @@ import javax.swing.Timer;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ChangeListener;
+import net.runelite.client.util.ImageUtil;
 
 import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_HEIGHT;
 import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
@@ -67,6 +68,9 @@ final class RotationEditorDialog extends JFrame {
 			return label;
 		}
 	}
+
+	private static final ImageIcon RESET_ICON =
+		new ImageIcon(ImageUtil.loadImageResource(RotationEditorDialog.class, "reset.png"));
 
 	private static final int PREVIEW_SCALE = 6;
 	private static final int COMMIT_THROTTLE_MS = 100;
@@ -329,7 +333,7 @@ final class RotationEditorDialog extends JFrame {
 	}
 
 	private JPanel fieldRow(String text, JSpinner spinner, IntSupplier defaultValue) {
-		JButton reset = new JButton("↺");
+		JButton reset = new JButton(RESET_ICON);
 		reset.setMargin(new Insets(0, 4, 0, 4));
 		reset.setToolTipText("Reset " + text);
 		reset.addActionListener(e -> applyImmediately(() -> spinner.setValue(defaultValue.getAsInt())));

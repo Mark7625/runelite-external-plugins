@@ -1,10 +1,13 @@
 package io.mark.hditemicons.hd;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import net.runelite.api.Model;
+import net.runelite.api.Texture;
 import net.runelite.api.TextureProvider;
 
 import static io.mark.hditemicons.hd.IconMath.ceilToInt;
@@ -31,6 +34,26 @@ class ItemIconRasterizer {
 	private static final double MAX_MISMATCHED_FRACTION = 0.1;
 	private static final int MAX_CHANNEL_ERROR = 32;
 
+	static final class IconTexture {
+		final int[] basePixels;
+		final int direction, speed, size;
+
+		IconTexture(int[] basePixels, int direction, int speed) {
+			this.basePixels = basePixels;
+			this.direction = direction;
+			this.speed = speed;
+			this.size = basePixels.length == 64 * 64 ? 64 : 128;
+		}
+
+		boolean scrolls() {
+			return direction >= 1 && direction <= 4 && speed > 0 && basePixels.length == size * size;
+		}
+
+		int period() {
+			return size / Math.min(Integer.lowestOneBit(speed), size);
+		}
+	}
+
 	/**
 	 * A snapshot of everything the rasterizer needs from a {@link Model}, copied up front so
 	 * rendering can happen off the client thread.
@@ -43,12 +66,17 @@ class ItemIconRasterizer {
 		@Nullable final byte[] paintLayer;
 		@Nullable final int[][] texelsByFace;
 		@Nullable final int[] uvA, uvB, uvC;
+		@Nullable final IconTexture[] textures;
+		@Nullable final int[] textureByFace;
+		final int animationPeriod;
+		final boolean animated;
 
 		private IconModel(float[] vertexX, float[] vertexY, float[] vertexZ,
 						int[] triangleA, int[] triangleB, int[] triangleC,
 						int[] shadeA, int[] shadeB, int[] shadeC,
 						@Nullable byte[] alpha, @Nullable byte[] paintLayer,
-						@Nullable int[][] texelsByFace, @Nullable int[] uvA, @Nullable int[] uvB, @Nullable int[] uvC) {
+						@Nullable int[][] texelsByFace, @Nullable int[] uvA, @Nullable int[] uvB, @Nullable int[] uvC,
+						@Nullable IconTexture[] textures, @Nullable int[] textureByFace) {
 			this.vertexX = vertexX;
 			this.vertexY = vertexY;
 			this.vertexZ = vertexZ;
@@ -64,6 +92,16 @@ class ItemIconRasterizer {
 			this.uvA = uvA;
 			this.uvB = uvB;
 			this.uvC = uvC;
+			this.textures = textures;
+			this.textureByFace = textureByFace;
+
+			int animationPeriod = 0;
+			if (textures != null)
+				for (IconTexture texture : textures)
+					if (texture.scrolls())
+						animationPeriod = Math.max(animationPeriod, texture.period());
+			this.animationPeriod = animationPeriod;
+			this.animated = animationPeriod > 1;
 		}
 
 		/**
@@ -74,26 +112,37 @@ class ItemIconRasterizer {
 			int faceCount = model.getFaceCount();
 			int[][] texelsByFace = null;
 			int[] uvA = null, uvB = null, uvC = null;
+			IconTexture[] captured = null;
+			int[] textureByFace = null;
 			short[] faceTextures = model.getFaceTextures();
 			if (faceTextures != null) {
 				texelsByFace = new int[faceCount][];
+				textureByFace = new int[faceCount];
+				Arrays.fill(textureByFace, -1);
 				uvA = Arrays.copyOf(model.getFaceIndices1(), faceCount);
 				uvB = Arrays.copyOf(model.getFaceIndices2(), faceCount);
 				uvC = Arrays.copyOf(model.getFaceIndices3(), faceCount);
 				byte[] textureFaces = model.getTextureFaces();
-				Map<Integer, int[]> loadedTextures = new HashMap<>();
+				List<IconTexture> distinct = new ArrayList<>();
+				Map<Integer, Integer> loadedTextures = new HashMap<>();
 				for (int f = 0; f < faceCount; f++) {
 					if (faceTextures[f] == -1)
 						continue;
 					int textureId = faceTextures[f];
-					int[] texels = loadedTextures.computeIfAbsent(textureId,
-						id -> {
-							int[] loaded = textures.load(id);
-							return loaded == null ? null : loaded.clone();
-						});
-					if (texels == null)
-						return null;
-					texelsByFace[f] = texels;
+					Integer index = loadedTextures.get(textureId);
+					if (index == null) {
+						int[] loaded = textures.load(textureId);
+						if (loaded == null)
+							return null;
+						Texture texture = textureAt(textures, textureId);
+						index = distinct.size();
+						distinct.add(new IconTexture(loaded.clone(),
+							texture == null ? 0 : texture.getAnimationDirection(),
+							texture == null ? 0 : texture.getAnimationSpeed()));
+						loadedTextures.put(textureId, index);
+					}
+					texelsByFace[f] = distinct.get(index).basePixels;
+					textureByFace[f] = index;
 					if (textureFaces != null && textureFaces[f] != -1) {
 						int t = textureFaces[f] & 0xFF;
 						uvA[f] = model.getTexIndices1()[t];
@@ -101,6 +150,7 @@ class ItemIconRasterizer {
 						uvC[f] = model.getTexIndices3()[t];
 					}
 				}
+				captured = distinct.toArray(new IconTexture[0]);
 			}
 
 			int vertexCount = model.getVerticesCount();
@@ -116,8 +166,14 @@ class ItemIconRasterizer {
 				Arrays.copyOf(model.getFaceColors3(), faceCount),
 				model.getFaceTransparencies() == null ? null : Arrays.copyOf(model.getFaceTransparencies(), faceCount),
 				model.getFaceRenderPriorities() == null ? null : Arrays.copyOf(model.getFaceRenderPriorities(), faceCount),
-				texelsByFace, uvA, uvB, uvC
+				texelsByFace, uvA, uvB, uvC, captured, textureByFace
 			);
+		}
+
+		@Nullable
+		private static Texture textureAt(TextureProvider provider, int textureId) {
+			Texture[] all = provider.getTextures();
+			return all != null && textureId >= 0 && textureId < all.length ? all[textureId] : null;
 		}
 	}
 
@@ -127,6 +183,11 @@ class ItemIconRasterizer {
 	private double centerOffsetX, centerOffsetY, cameraDistance;
 	// The baseline every camera placement starts from, before any pan is layered on top.
 	private final double naturalOffsetX, naturalOffsetY;
+
+	@Nullable
+	private int[][] texelsByFace;
+	@Nullable
+	private int[][] scrolledTexels;
 
 	// Scratch buffers reused across the many renderSamples() calls a single fit performs
 	// (up to FIT_ITERATIONS wide renders plus the final render), to avoid re-allocating
@@ -153,6 +214,7 @@ class ItemIconRasterizer {
 						double resizeX128, double resizeY128, double resizeZ128, int supersample) {
 		this.model = model;
 		this.supersample = supersample;
+		this.texelsByFace = model.texelsByFace;
 		int vertexCount = model.vertexX.length;
 		posX = new double[vertexCount];
 		posY = new double[vertexCount];
@@ -346,6 +408,49 @@ class ItemIconRasterizer {
 				if (mask[ny * ICON_WIDTH + nx])
 					return true;
 		return false;
+	}
+
+	void animateTo(int cycles) {
+		IconTexture[] textures = model.textures;
+		if (!model.animated || textures == null || model.textureByFace == null)
+			return;
+
+		if (scrolledTexels == null) {
+			scrolledTexels = new int[textures.length][];
+			for (int t = 0; t < textures.length; t++)
+				scrolledTexels[t] = textures[t].scrolls()
+					? new int[textures[t].basePixels.length] : textures[t].basePixels;
+			int[][] byFace = new int[model.textureByFace.length][];
+			for (int f = 0; f < byFace.length; f++) {
+				int texture = model.textureByFace[f];
+				byFace[f] = texture == -1 ? null : scrolledTexels[texture];
+			}
+			texelsByFace = byFace;
+		}
+
+		for (int t = 0; t < textures.length; t++)
+			if (textures[t].scrolls())
+				scroll(textures[t], scrolledTexels[t], cycles);
+	}
+
+	static void scroll(IconTexture texture, int[] into, int cycles) {
+		int[] base = texture.basePixels;
+		int size = texture.size;
+		int phase = (int) (((long) cycles * texture.speed) % size);
+		if (texture.direction == 1 || texture.direction == 3)
+			phase = -phase;
+
+		if (texture.direction <= 2) {
+			int shift = phase * size;
+			int mask = base.length - 1;
+			for (int i = 0; i < base.length; i++)
+				into[i] = base[shift + i & mask];
+		} else {
+			int mask = size - 1;
+			for (int row = 0; row < base.length; row += size)
+				for (int x = 0; x < size; x++)
+					into[row + x] = base[row + (phase + x & mask)];
+		}
 	}
 
 	/**
@@ -718,7 +823,7 @@ class ItemIconRasterizer {
 			shadeB = shadeC = shadeA;
 		int transparency = model.alpha == null ? 0 : model.alpha[face] & 0xFF;
 
-		int[] texels = model.texelsByFace == null ? null : model.texelsByFace[face];
+		int[] texels = texelsByFace == null ? null : texelsByFace[face];
 		int textureSize = 0;
 		double[] planeU = null, planeV = null, planeW = null;
 		if (texels != null) {

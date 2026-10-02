@@ -73,6 +73,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
+	// An animation is at most 128 cycles long, so this is how much of one is kept at worst
+	private static final int MAX_ANIMATION_FRAMES = 32;
 	private static final int[] KEPT_CONTAINERS = {InventoryID.INV, InventoryID.WORN};
 	private static final float DRAGGED_OPACITY = 128 / 256f;
 	private static final float MIN_SHAPE_COVERAGE = .9f;
@@ -114,8 +116,15 @@ public class HdItemIcons extends WidgetItemOverlay {
 		volatile boolean uncached;
 		volatile boolean[] outlineRing;
 		volatile int[] pixels;
+		// One frame per phase of the icon's animation, and how long that animation runs for in
+		// client cycles. A still icon is a single frame with no period.
+		volatile int[][] frames;
+		volatile boolean[][] frameRings;
+		volatile int period;
+		int shownFrame = -1;
 		int[] selectedPixels;
 		boolean[] selectedOutlineRing;
+		int[] selectedFrom;
 		int itemId = -1;
 	}
 
@@ -163,8 +172,6 @@ public class HdItemIcons extends WidgetItemOverlay {
 			return (patchFlags[patch] & flag) != 0;
 		}
 
-		// Keyed on the quality's supersampling rather than the setting itself, so the key of an
-		// already-rendered icon doesn't move when a quality is added to the setting
 		private static long fingerprintOf(int itemId, int borderWidth, int supersample, int[] pixels) {
 			long h = 0xCBF29CE484222325L; // FNV-1a
 			h = mix(h, itemId);
@@ -415,6 +422,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private IconQuality lastKnownQuality;
 	private boolean lastKnownCustomRotationsEnabled = true;
 	private boolean lastKnownStretched;
+	private boolean lastKnownAnimateTextures = true;
+	private int animationCycle;
 	@Nullable
 	private Filepath iconCacheDirectory;
 	@Nullable
@@ -584,6 +593,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		lastKnownQuality = null;
 		lastKnownCustomRotationsEnabled = true;
 		lastKnownStretched = false;
+		lastKnownAnimateTextures = true;
+		animationCycle = 0;
 	}
 
 	@Subscribe
@@ -604,25 +615,47 @@ public class HdItemIcons extends WidgetItemOverlay {
 		// Icons are sharpened only when the interface is stretched, so they can't be shared
 		// between the two - a sharpened icon drawn at 1:1 looks over-sharpened
 		boolean stretched = client.isStretchedEnabled();
+		boolean animateTextures = config.animateTextures();
 		if (brightness != lastKnownBrightness || quality != lastKnownQuality
 			|| customRotationsEnabled != lastKnownCustomRotationsEnabled
-			|| stretched != lastKnownStretched) {
+			|| stretched != lastKnownStretched || animateTextures != lastKnownAnimateTextures) {
 			// Both the game's icons and ours depend on the brightness setting, and our own
 			// renders depend on the configured supersampling quality
 			lastKnownBrightness = brightness;
 			lastKnownQuality = quality;
 			lastKnownCustomRotationsEnabled = customRotationsEnabled;
 			lastKnownStretched = stretched;
+			lastKnownAnimateTextures = animateTextures;
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
-			iconCache = iconCacheDirectory == null ? null : new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, PATCH_SIZE);
+			iconCache = iconCacheDirectory == null ? null
+				: new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, animateTextures, PATCH_SIZE);
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
 		}
 
+		animationCycle = client.getGameCycle();
 		// Every frame, so icons are prepared as soon as the game sends the items, not once an interface shows them
 		prefetchQueuedContainers();
+	}
+
+	/**
+	 * Points the icon at the frame its animation is up to. The frames are rendered once and kept,
+	 * so this is all an animated icon costs per frame of the game's.
+	 */
+	private void showAnimationFrame(RenderedIcon icon) {
+		int[][] frames = icon.frames;
+		if (frames == null || frames.length == 1 || icon.period < 1)
+			return;
+
+		int frame = Math.floorMod(animationCycle, icon.period) * frames.length / icon.period;
+		if (frame == icon.shownFrame)
+			return;
+
+		icon.shownFrame = frame;
+		icon.outlineRing = icon.frameRings[frame];
+		icon.pixels = frames[frame];
 	}
 
 	@Subscribe
@@ -696,6 +729,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		RenderedIcon icon = iconFor(normal, itemId, quantity, Math.min(borderWidth, 1), true);
 		if (icon == null || icon == PENDING || icon.pixels == null)
 			return null;
+		showAnimationFrame(icon);
 
 		Rectangle onScreen = bounds.intersection(widget.getParent().getBounds());
 		boolean isDragged = widget == client.getDraggedWidget();
@@ -717,9 +751,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 		int[] pixels = icon.pixels;
 		boolean[] outlineRing = icon.outlineRing;
 		if (selected) {
-			if (icon.selectedPixels == null) {
-				icon.selectedPixels = ItemIconRasterizer.withSelectionBorder(icon.pixels, PATCH_WIDTH, PATCH_HEIGHT);
+			if (icon.selectedFrom != pixels) {
+				icon.selectedPixels = ItemIconRasterizer.withSelectionBorder(pixels, PATCH_WIDTH, PATCH_HEIGHT);
 				icon.selectedOutlineRing = ItemIconRasterizer.outlineRing(icon.selectedPixels, PATCH_WIDTH, PATCH_HEIGHT);
+				icon.selectedFrom = pixels;
 			}
 			pixels = icon.selectedPixels;
 			outlineRing = icon.selectedOutlineRing;
@@ -947,7 +982,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 				icon.failed = true;
 				ItemIconCache cache = iconCache;
 				if (cache != null)
-					renderExecutor.execute(() -> cache.save(reference.fingerprint, null));
+					renderExecutor.execute(() -> cache.save(reference.fingerprint, 0, null));
 			} else {
 				beginRenderingIcon(icon, modelItemId, borderWidth, reference.fingerprint);
 			}
@@ -957,16 +992,26 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	private void loadIcon(RenderedIcon icon, ItemIconCache cache, long fingerprint) {
 		renderExecutor.execute(() -> {
-			int[] kept = cache.load(fingerprint);
-			if (kept == null) {
+			ItemIconCache.Kept kept = cache.load(fingerprint);
+			if (kept == null)
 				icon.uncached = true;
-			} else if (kept.length == 0) {
+			else if (kept.frames.length == 0)
 				icon.failed = true;
-			} else {
-				icon.outlineRing = ItemIconRasterizer.outlineRing(kept, PATCH_WIDTH, PATCH_HEIGHT);
-				icon.pixels = kept;
-			}
+			else
+				publishFrames(icon, kept.period, kept.frames);
 		});
+	}
+
+	private static void publishFrames(RenderedIcon icon, int period, int[][] frames) {
+		boolean[][] rings = new boolean[frames.length][];
+		for (int frame = 0; frame < frames.length; frame++)
+			rings[frame] = ItemIconRasterizer.outlineRing(frames[frame], PATCH_WIDTH, PATCH_HEIGHT);
+
+		icon.frameRings = rings;
+		icon.period = period;
+		icon.frames = frames;
+		icon.outlineRing = rings[0];
+		icon.pixels = frames[0];
 	}
 
 	private boolean consumeRenderBudget(boolean visibleNow) {
@@ -1108,37 +1153,64 @@ public class HdItemIcons extends WidgetItemOverlay {
 		int supersample = config.iconQuality().getSupersample();
 		boolean sharpen = lastKnownStretched;
 		ItemIconCache cache = iconCache;
+		int period = lastKnownAnimateTextures ? animationPeriodOf(layers) : 0;
+		int animationFrames = period < 2 ? 1 : Math.min(period, MAX_ANIMATION_FRAMES);
 		renderExecutor.execute(() -> {
 			try {
 				int[] palette = paletteFor(brightness);
-				int[] combined = null;
-				for (ModelLayer layer : layers) {
+				ItemIconRasterizer[] rasterizers = new ItemIconRasterizer[layers.length];
+				boolean[] outlined = new boolean[layers.length];
+				for (int i = 0; i < layers.length; i++) {
+					ModelLayer layer = layers[i];
 					CustomRotation placement = layer.placement;
 					ItemIconRasterizer rasterizer = placement == null
 						? new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau, supersample)
 						: new ItemIconRasterizer(layer.model, layer.pitchJau, layer.yawJau, layer.rollJau,
 							placement.resizeX, placement.resizeY, placement.resizeZ, supersample);
+					rasterizers[i] = rasterizer;
+					outlined[i] = layer.borderWidth > 0;
+					rasterizer.animateTo(0);
 					if (placement != null) {
 						rasterizer.placeExplicitly(placement.zoom2d, placement.offsetX, placement.offsetY);
 					} else if (!rasterizer.fitToReferenceSilhouette(layer.referencePixels, palette)) {
 						icon.failed = true;
 						if (cache != null)
-							cache.save(fingerprint, null);
+							cache.save(fingerprint, 0, null);
 						return;
 					}
-					int[] rendered = rasterizer.render(MARGIN, layer.borderWidth > 0, sharpen, palette);
-					combined = combined == null ? rendered : ItemIconRasterizer.compositeOver(rendered, combined);
 				}
-				icon.outlineRing = ItemIconRasterizer.outlineRing(combined, PATCH_WIDTH, PATCH_HEIGHT);
-				icon.pixels = combined;
 
+				int[][] frames = new int[animationFrames][];
+				for (int frame = 0; frame < animationFrames; frame++) {
+					int[] combined = null;
+					for (int i = 0; i < rasterizers.length; i++) {
+						rasterizers[i].animateTo(frame * period / animationFrames);
+						int[] rendered = rasterizers[i].render(MARGIN, outlined[i], sharpen, palette);
+						combined = combined == null ? rendered : ItemIconRasterizer.compositeOver(rendered, combined);
+					}
+					frames[frame] = combined;
+					// Shown as a still icon while the rest of its animation renders
+					if (frame == 0 && animationFrames > 1) {
+						icon.outlineRing = ItemIconRasterizer.outlineRing(combined, PATCH_WIDTH, PATCH_HEIGHT);
+						icon.pixels = combined;
+					}
+				}
+
+				publishFrames(icon, period, frames);
 				if (cache != null)
-					cache.save(fingerprint, combined);
+					cache.save(fingerprint, period, frames);
 			} catch (Throwable ex) {
 				log.debug("Unable to render an HD icon for item {}:", itemId, ex);
 				icon.failed = true;
 			}
 		});
+	}
+
+	private static int animationPeriodOf(ModelLayer[] layers) {
+		int period = 0;
+		for (ModelLayer layer : layers)
+			period = Math.max(period, layer.model.animationPeriod);
+		return period;
 	}
 
 	@Nullable

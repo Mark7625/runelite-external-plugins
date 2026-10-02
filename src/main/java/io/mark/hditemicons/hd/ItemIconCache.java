@@ -26,17 +26,33 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
  */
 @Slf4j
 class ItemIconCache {
-	// Bump when icons are drawn differently, or keyed differently
-	private static final int VERSION = 4;
+	// Bump when icons are drawn differently
+	private static final int VERSION = 6;
 	private static final int MAX_FOLDERS = 3;
+	private static final int HEADER_INTS = 2;
 
 	private final Filepath folder;
 	private final int size;
 
-	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, boolean stretched, int size) {
-		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
-			customRotations ? "" : "-default-rotations", stretched ? "-stretched" : ""));
+	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, boolean stretched,
+				boolean animatedTextures, int size) {
+		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s%s%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
+			customRotations ? "" : "-default-rotations", stretched ? "-stretched" : "", animatedTextures ? "" : "-static-textures"));
 		this.size = size;
+	}
+
+	/**
+	 * An icon as it was kept: one frame per phase of its animation, and the length of that
+	 * animation in client cycles. A still icon is one frame with no period.
+	 */
+	static final class Kept {
+		final int period;
+		final int[][] frames;
+
+		Kept(int period, int[][] frames) {
+			this.period = period;
+			this.frames = frames;
+		}
 	}
 
 	void markUsed() {
@@ -50,27 +66,36 @@ class ItemIconCache {
 	}
 
 	/**
-	 * The icon's pixels, no pixels if it couldn't be rendered, or null if it isn't kept.
+	 * The icon's frames, no frames if it couldn't be rendered, or null if it isn't kept.
 	 */
 	@Nullable
-	int[] load(long key) {
+	Kept load(long key) {
 		try {
 			byte[] file;
 			try (var in = folder.joinSegment(fileName(key)).openInputStream()) {
 				file = in.readAllBytes();
 			}
 			if (file.length == 0)
-				return new int[0];
+				return new Kept(0, new int[0][]);
 
 			byte[] data;
 			try (var in = new InflaterInputStream(new ByteArrayInputStream(file))) {
 				data = in.readAllBytes();
 			}
-			if (data.length != size * Integer.BYTES)
+			if (data.length < HEADER_INTS * Integer.BYTES)
 				return null;
-			int[] pixels = new int[size];
-			ByteBuffer.wrap(data).asIntBuffer().get(pixels);
-			return pixels;
+			var ints = ByteBuffer.wrap(data).asIntBuffer();
+			int period = ints.get();
+			int frameCount = ints.get();
+			if (frameCount < 1 || data.length != (HEADER_INTS + (long) frameCount * size) * Integer.BYTES)
+				return null;
+
+			int[][] frames = new int[frameCount][];
+			for (int frame = 0; frame < frameCount; frame++) {
+				frames[frame] = new int[size];
+				ints.get(frames[frame]);
+			}
+			return new Kept(period, frames);
 		} catch (NoSuchFileException ex) {
 			return null;
 		} catch (IOException ex) {
@@ -80,14 +105,18 @@ class ItemIconCache {
 	}
 
 	/**
-	 * Keeps the icon, or that it couldn't be rendered if there are no pixels.
+	 * Keeps the icon's frames, or that it couldn't be rendered if there are none.
 	 */
-	void save(long key, @Nullable int[] pixels) {
+	void save(long key, int period, @Nullable int[][] frames) {
 		try {
 			byte[] file = new byte[0];
-			if (pixels != null) {
-				var buffer = ByteBuffer.allocate(pixels.length * Integer.BYTES);
-				buffer.asIntBuffer().put(pixels);
+			if (frames != null) {
+				var buffer = ByteBuffer.allocate((HEADER_INTS + frames.length * size) * Integer.BYTES);
+				var ints = buffer.asIntBuffer();
+				ints.put(period);
+				ints.put(frames.length);
+				for (int[] frame : frames)
+					ints.put(frame);
 				var out = new ByteArrayOutputStream();
 				try (var deflater = new DeflaterOutputStream(out)) {
 					deflater.write(buffer.array());

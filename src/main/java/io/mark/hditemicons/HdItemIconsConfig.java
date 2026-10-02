@@ -31,7 +31,19 @@ public interface HdItemIconsConfig extends Config {
 		position = 1
 	)
 	default IconQuality iconQuality() {
-		return IconQuality.MEDIUM;
+		return IconQuality.NONE;
+	}
+
+	@ConfigItem(
+		keyName = "animateTextures",
+		name = "Animate textures",
+		description = "Scrolls the animated textures on an item's model the way the game scrolls them on"
+			+ " objects in the world, so icons of items made of water, lava and the like move. Every frame"
+			+ " of an item's animation is rendered once and then cached, so it only costs the once.",
+		position = 2
+	)
+	default boolean animateTextures() {
+		return true;
 	}
 
 	@Range(min = 1, max = 8)
@@ -40,7 +52,7 @@ public interface HdItemIconsConfig extends Config {
 		name = "Render threads",
 		description = "How many background threads render icons at once. Higher can render icons faster"
 			+ " when many are queued at once (e.g. opening a full bank), at the cost of more CPU usage.",
-		position = 2
+		position = 3
 	)
 	default int renderThreadCount() {
 		return 2;
@@ -51,7 +63,7 @@ public interface HdItemIconsConfig extends Config {
 		name = "Custom icon rotations",
 		description = "Turn off to render every item's default icon rotation and ignore any custom rotations"
 			+ " you've saved. Saved rotations aren't deleted, so re-enabling restores them.",
-		position = 3
+		position = 4
 	)
 	default boolean customRotationsEnabled() {
 		return true;
@@ -61,7 +73,7 @@ public interface HdItemIconsConfig extends Config {
 		keyName = "editRotationHotkey",
 		name = "Edit icon rotation hotkey",
 		description = "Hold this while right-clicking an item to add an \"Edit icon rotation\" option to its menu.",
-		position = 4
+		position = 5
 	)
 	default Keybind editRotationHotkey() {
 		return Keybind.SHIFT;

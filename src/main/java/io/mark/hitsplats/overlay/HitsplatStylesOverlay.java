@@ -3,6 +3,7 @@ package io.mark.hitsplats.overlay;
 import io.mark.hitsplats.art.HitsplatSkin;
 import io.mark.hitsplats.art.HitsplatSprites;
 import io.mark.hitsplats.art.HitsplatStyle;
+import io.mark.hitsplats.art.StyleProperties;
 import io.mark.hitsplats.HitsplatStylesPlugin;
 import io.mark.hitsplats.combat.CombatStyle;
 import io.mark.hitsplats.config.HitsplatIconSet;
@@ -72,9 +73,9 @@ public class HitsplatStylesOverlay extends Overlay
 		return value * sizePercent / 100;
 	}
 
-	private static int sizeOf(HitsplatStyle style, int splatSize)
+	private int sizeOf(StyleProperties properties, int splatSize)
 	{
-		return style.getScale() * splatSize / 100;
+		return properties.getSize() * splatSize / 100;
 	}
 
 
@@ -228,7 +229,8 @@ public class HitsplatStylesOverlay extends Overlay
 
 		alpha = Math.max(0, Math.min(255, alpha));
 
-		int size = sizeOf(frame.style, frame.splatSize);
+		StyleProperties properties = sprites.getProperties(frame.style);
+		int size = sizeOf(properties, frame.splatSize);
 		int splatX = anchor.getX() + offsetX - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
 		int top = anchor.getY() + offsetY + scaled(NATIVE_SPLAT_TOP, size) + animationY;
 		int centerY = top + image.getHeight() / 2;
@@ -261,12 +263,12 @@ public class HitsplatStylesOverlay extends Overlay
 
 		String text = splat.getText();
 		int textX = splatX + (image.getWidth() - frame.fontMetrics.stringWidth(text)) / 2;
-		int textY = top + scaled(DAMAGE_BASELINE, size) + frame.style.getTextOffsetY()
+		int textY = top + scaled(DAMAGE_BASELINE, size) + properties.getTextOffsetY()
 			+ (frame.style == HitsplatStyle.STYLE_2010 ? HEAL_BASELINE_2010 : HEAL_BASELINE);
 
-		graphics.setColor(Color.BLACK);
+		graphics.setColor(properties.getTextShadowColor());
 		graphics.drawString(text, textX + 1, textY);
-		graphics.setColor(Color.WHITE);
+		graphics.setColor(properties.getTextColor());
 		graphics.drawString(text, textX, textY);
 	}
 
@@ -326,7 +328,8 @@ public class HitsplatStylesOverlay extends Overlay
 
 		alpha = Math.max(0, Math.min(255, alpha));
 
-		int size = sizeOf(style, frame.splatSize);
+		StyleProperties properties = sprites.getProperties(style);
+		int size = sizeOf(properties, frame.splatSize);
 		int slot = Math.min(splat.getSlot() << 1, SLOT_OFFSET.length - 2);
 		int splatX = anchor.getX() + SLOT_OFFSET[slot] - image.getWidth() / 2 + NATIVE_SPLAT_PAD;
 		int top = anchor.getY() + SLOT_OFFSET[slot | 1] + scaled(NATIVE_SPLAT_TOP, size) + animationY;
@@ -369,11 +372,11 @@ public class HitsplatStylesOverlay extends Overlay
 		if (!(frame.hideBlockedDamage && splat.isBlock()))
 		{
 			int textX = splatX + (image.getWidth() - frame.fontMetrics.stringWidth(text)) / 2;
-			int textY = top + scaled(DAMAGE_BASELINE, size) + style.getTextOffsetY() + hitBaseline(style);
+			int textY = top + scaled(DAMAGE_BASELINE, size) + properties.getTextOffsetY() + hitBaseline(style);
 
-			graphics.setColor(Color.BLACK);
+			graphics.setColor(properties.getTextShadowColor());
 			graphics.drawString(text, textX + 1, textY);
-			graphics.setColor(Color.WHITE);
+			graphics.setColor(properties.getTextColor());
 			graphics.drawString(text, textX, textY);
 		}
 	}

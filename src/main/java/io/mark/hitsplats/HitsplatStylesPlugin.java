@@ -13,6 +13,7 @@ import io.mark.hitsplats.heal.HealTracker;
 import io.mark.hitsplats.hit.HitsplatTracker;
 import io.mark.hitsplats.overlay.HitsplatStylesOverlay;
 import io.mark.hitsplats.overlay.NpcHeights;
+import java.io.IOException;
 import java.util.Map;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ import net.runelite.api.events.PlayerDespawned;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.gameval.SpriteID;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
@@ -44,6 +46,7 @@ import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.itemstats.ItemStatPlugin;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Filepath;
 
 @Slf4j
 @PluginDescriptor(
@@ -77,6 +80,9 @@ public class HitsplatStylesPlugin extends Plugin {
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Inject
 	private HitsplatStylesConfig config;
@@ -125,7 +131,7 @@ public class HitsplatStylesPlugin extends Plugin {
 	@Override
 	protected void startUp() {
 		overlayManager.add(overlay);
-		sprites.load(config.shadowWidth(), config.splatSize());
+		loadSprites(false);
 		combatStyleTables.load();
 		npcHeights.load();
 
@@ -136,7 +142,7 @@ public class HitsplatStylesPlugin extends Plugin {
 		hideNativeHitsplats();
 
 		if (client.getGameState() == GameState.LOGGED_IN) {
-			queueRelogMessage("Hitsplat Styles: log out and back in to hide the default hitsplats.");
+			queueMessage("Hitsplat Styles: log out and back in to hide the default hitsplats.");
 		}
 	}
 
@@ -153,6 +159,39 @@ public class HitsplatStylesPlugin extends Plugin {
 		npcHeights.clear();
 		sprites.clear();
 		showNativeHitsplats();
+	}
+
+	private void loadSprites(boolean announceEmpty) {
+		boolean packs = config.resourcePacks();
+		sprites.load(config.shadowWidth(), config.splatSize(),
+			packs ? this::overrideDirectory : () -> null,
+			applied -> clientThread.invokeLater(() -> announceResourcePack(packs, applied, announceEmpty)));
+	}
+
+	private void announceResourcePack(boolean packs, int applied, boolean announceEmpty) {
+		if (!packs) {
+			if (announceEmpty) {
+				queueMessage("Hitsplat Styles: resource packs off, using the built-in art.");
+			}
+
+			return;
+		}
+
+		if (applied > 0) {
+			queueMessage("Hitsplat Styles: applied " + applied
+				+ (applied == 1 ? " sprite" : " sprites") + " from your resource pack.");
+		} else if (announceEmpty) {
+			queueMessage("Hitsplat Styles: no resource pack sprites found in plugin-data/hitsplat-styles.");
+		}
+	}
+
+	private Filepath overrideDirectory() {
+		try {
+			return getPluginDirectory();
+		} catch (IOException e) {
+			log.debug("Unable to open the hitsplat override directory", e);
+			return null;
+		}
 	}
 
 	private void hideNativeHitsplats() {
@@ -177,7 +216,7 @@ public class HitsplatStylesPlugin extends Plugin {
 		blankSprite = null;
 	}
 
-	private void queueRelogMessage(String message) {
+	private void queueMessage(String message) {
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage(message)
@@ -246,9 +285,11 @@ public class HitsplatStylesPlugin extends Plugin {
 			return;
 		}
 
-		if (HitsplatStylesConfig.KEY_SHADOW_WIDTH.equals(event.getKey())
+		if (HitsplatStylesConfig.KEY_RESOURCE_PACKS.equals(event.getKey())) {
+			loadSprites(true);
+		} else if (HitsplatStylesConfig.KEY_SHADOW_WIDTH.equals(event.getKey())
 			|| HitsplatStylesConfig.KEY_SPLAT_SIZE.equals(event.getKey())) {
-			sprites.load(config.shadowWidth(), config.splatSize());
+			loadSprites(false);
 		}
 
 		if (!config.healSplatMode().isEnabled()) {

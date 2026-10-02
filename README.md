@@ -16,6 +16,7 @@ venom, disease, burn and bleed splat is drawn in that era's art.
   did it beside the number.
 - **Burn and bleed** - covered too, in every style.
 - **Resize them** - scale the art up without blurring it, so the pixel art stays sharp.
+- **Bring your own art** - drop a PNG in the plugin's folder to replace any splat or icon.
 - **Float and fade** - splats drift up and fade away instead of blinking out.
 - **Drop shadows** - a soft shadow so splats stand out against bright ground.
 - **Tinting** - the game dims hits you had no hand in. Keep it, switch it off, or dim everything.
@@ -26,6 +27,7 @@ venom, disease, burn and bleed splat is drawn in that era's art.
 | --- | --- | --- |
 | Style | 2010 | The era your splats are drawn in |
 | Splat size | 100 | Scales the art, as a percentage. Stays sharp rather than blurring |
+| Use resource packs | On | Use your own PNGs from the plugin's folder in place of the built-in art |
 | Tint other people's hits | Game default | Dim hits you had no part in, as the game does |
 
 ### Blocked hits
@@ -57,6 +59,63 @@ venom, disease, burn and bleed splat is drawn in that era's art.
 | --- | --- | --- |
 | Show heal splats | Splat with item | Off, splat only, or the splat plus what healed you |
 | Show overheal | Off | Show what the food was worth, not what you had room for |
+
+## Bring your own art
+
+Any sprite can be swapped for one of your own. Drop a PNG into
+
+```
+.runelite/plugin-data/hitsplat-styles/
+```
+
+using the same folder and file names the plugin uses internally, and it wins over the built-in one.
+The folders are created for you the first time the plugin loads:
+
+```
+hitsplat-styles/
+  2002/  2010/  2011/  osrs/     damage_normal.png, block_normal.png, heal.png, burn.png, ...
+                                 style.properties
+  style_icons/
+    modern/  osrs/                meele.png, range.png, magic.png, cannon.png, defence.png
+```
+
+So `2010/heal.png` replaces the heal splat on the 2010 style only, and leaves every other style and
+every other splat alone. Anything you don't provide falls back to the art that ships with the plugin.
+
+### Style settings
+
+Drop a `style.properties` beside the art in any style folder - say `2010/style.properties` - to
+change how that style is drawn. Every key is optional, and anything you leave out keeps the
+plugin's own value.
+
+```properties
+size=120
+textColor=#FFFF00
+textShadowColor=#000000
+shadowColor=#000000
+shadowAlpha=120
+textOffsetY=0
+```
+
+| Key | What it does |
+| --- | --- |
+| `size` | Scales this style's art, as a percentage. Multiplies with the Splat size setting |
+| `textColor` | Colour of the damage number |
+| `textShadowColor` | Colour of the drop shadow behind the number |
+| `shadowColor` | Colour of the soft outline behind the splat |
+| `shadowAlpha` | How strong that outline is, `0` - `255`. `0` turns it off for this style |
+| `textOffsetY` | Nudges the number up or down, in pixels |
+
+Colours take `#RRGGBB` or `#AARRGGBB`, with or without the `#`.
+
+A few notes:
+
+- **Per style, not global.** Drop the same file in all four folders to change it everywhere.
+- **Size is up to you.** Splats are centred on the same point, so a larger image grows outward
+  rather than shifting. Splat size and the drop shadow are applied to your art too.
+- **New files are picked up when the art reloads** - toggling **Use resource packs** off and on is
+  the quickest way, and it tells you in chat how many sprites it picked up.
+- **Switch the lot off** with **Use resource packs** without moving your files anywhere.
 
 ## Seen a wrong splat?
 

@@ -5,14 +5,22 @@ import io.mark.hitsplats.config.HitsplatIconSet;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.IntConsumer;
+import java.util.function.Supplier;
+import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 
 @Slf4j
@@ -30,6 +38,7 @@ public class HitsplatSprites
 	private volatile Map<HitsplatIconSet, Map<CombatStyle, BufferedImage>> icons;
 	private volatile Map<HitsplatIconSet, Map<CombatStyle, BufferedImage>> iconShadows;
 	private volatile Map<HitsplatIconSet, Integer> iconSlotWidths;
+	private volatile Map<HitsplatStyle, StyleProperties> styleProperties;
 
 	@Inject
 	private HitsplatSprites(ScheduledExecutorService executor)
@@ -37,17 +46,23 @@ public class HitsplatSprites
 		this.executor = executor;
 	}
 
-	public void load(int shadowRadius, int scalePercent)
+	public void load(int shadowRadius, int scalePercent, Supplier<Filepath> overrides, IntConsumer onLoaded)
 	{
 		executor.execute(() ->
 		{
+			Overrides overrideRoot = new Overrides(prepareOverrideDirectory(overrides));
+
+			Map<HitsplatStyle, StyleProperties> loadedProperties = new EnumMap<>(HitsplatStyle.class);
 			Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> loaded = new EnumMap<>(HitsplatStyle.class);
 			Map<HitsplatStyle, Map<HitsplatSkin, BufferedImage>> loadedShadows = new EnumMap<>(HitsplatStyle.class);
 			for (HitsplatStyle style : HitsplatStyle.values())
 			{
-				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, style.getScale() * scalePercent / 100);
+				StyleProperties properties = overrideRoot.loadProperties(style);
+				loadedProperties.put(style, properties);
+
+				Map<HitsplatSkin, BufferedImage> pack = loadPack(style, properties.getSize() * scalePercent / 100, overrideRoot);
 				loaded.put(style, pack);
-				loadedShadows.put(style, outlinePack(pack, shadowRadius));
+				loadedShadows.put(style, outlinePack(pack, shadowRadius, properties));
 			}
 
 			Map<HitsplatIconSet, Map<CombatStyle, BufferedImage>> loadedIcons = new EnumMap<>(HitsplatIconSet.class);
@@ -56,7 +71,7 @@ public class HitsplatSprites
 
 			for (HitsplatIconSet set : HitsplatIconSet.values())
 			{
-				Map<CombatStyle, BufferedImage> setIcons = loadIcons(set);
+				Map<CombatStyle, BufferedImage> setIcons = loadIcons(set, overrideRoot);
 				Map<CombatStyle, BufferedImage> shadows = new EnumMap<>(CombatStyle.class);
 				int widest = 0;
 
@@ -64,7 +79,7 @@ public class HitsplatSprites
 				{
 					if (shadowRadius > 0)
 					{
-						shadows.put(entry.getKey(), outline(entry.getValue(), shadowRadius, SHADOW_ALPHA));
+						shadows.put(entry.getKey(), outline(entry.getValue(), shadowRadius, SHADOW_ALPHA, 0));
 					}
 
 					widest = Math.max(widest, entry.getValue().getWidth());
@@ -78,8 +93,11 @@ public class HitsplatSprites
 			iconSlotWidths = widths;
 			iconShadows = loadedIconShadows;
 			icons = loadedIcons;
+			styleProperties = loadedProperties;
 			packShadows = loadedShadows;
 			packs = loaded;
+
+			onLoaded.accept(overrideRoot.getApplied());
 		});
 	}
 
@@ -90,6 +108,14 @@ public class HitsplatSprites
 		icons = null;
 		iconShadows = null;
 		iconSlotWidths = null;
+		styleProperties = null;
+	}
+
+	public StyleProperties getProperties(HitsplatStyle style)
+	{
+		Map<HitsplatStyle, StyleProperties> loaded = styleProperties;
+		StyleProperties properties = loaded == null ? null : loaded.get(style);
+		return properties == null ? StyleProperties.defaults(style) : properties;
 	}
 
 	public BufferedImage get(HitsplatStyle style, HitsplatSkin skin)
@@ -116,10 +142,11 @@ public class HitsplatSprites
 		return pack == null ? null : pack.get(skin);
 	}
 
-	private static Map<HitsplatSkin, BufferedImage> outlinePack(Map<HitsplatSkin, BufferedImage> pack, int shadowRadius)
+	private static Map<HitsplatSkin, BufferedImage> outlinePack(Map<HitsplatSkin, BufferedImage> pack, int shadowRadius,
+		StyleProperties properties)
 	{
 		Map<HitsplatSkin, BufferedImage> shadows = new EnumMap<>(HitsplatSkin.class);
-		if (shadowRadius <= 0)
+		if (shadowRadius <= 0 || properties.getShadowAlpha() <= 0)
 		{
 			return shadows;
 		}
@@ -130,7 +157,7 @@ public class HitsplatSprites
 		for (Map.Entry<HitsplatSkin, BufferedImage> entry : pack.entrySet())
 		{
 			shadows.put(entry.getKey(), byImage.computeIfAbsent(entry.getValue(),
-				image -> outline(image, shadowRadius, SHADOW_ALPHA)));
+				image -> outline(image, shadowRadius, properties.getShadowAlpha(), properties.getShadowRgb())));
 		}
 
 		return shadows;
@@ -170,12 +197,12 @@ public class HitsplatSprites
 		return pack == null ? null : pack.get(style);
 	}
 
-	private static Map<CombatStyle, BufferedImage> loadIcons(HitsplatIconSet set)
+	private static Map<CombatStyle, BufferedImage> loadIcons(HitsplatIconSet set, Overrides overrideRoot)
 	{
 		Map<CombatStyle, BufferedImage> pack = new EnumMap<>(CombatStyle.class);
 		for (CombatStyle style : CombatStyle.values())
 		{
-			BufferedImage image = loadImage(ICON_DIRECTORY + "/" + set.getDirectory(), style.getFileName());
+			BufferedImage image = loadImage(overrideRoot, ICON_DIRECTORY + "/" + set.getDirectory(), style.getFileName());
 			if (image != null)
 			{
 				pack.put(style, trim(image));
@@ -186,7 +213,7 @@ public class HitsplatSprites
 		return pack;
 	}
 
-	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style, int scalePercent)
+	private static Map<HitsplatSkin, BufferedImage> loadPack(HitsplatStyle style, int scalePercent, Overrides overrideRoot)
 	{
 		Map<HitsplatSkin, BufferedImage> pack = new EnumMap<>(HitsplatSkin.class);
 		Map<String, BufferedImage> byFileName = new HashMap<>();
@@ -202,7 +229,7 @@ public class HitsplatSprites
 				}
 				else
 				{
-					image = scale(loadImage(style.getDirectory(), fileName), scalePercent);
+					image = scale(loadImage(overrideRoot, style.getDirectory(), fileName), scalePercent);
 					byFileName.put(fileName, image);
 				}
 
@@ -218,7 +245,7 @@ public class HitsplatSprites
 		return pack;
 	}
 
-	private static BufferedImage outline(BufferedImage image, int radius, int maxAlpha)
+	private static BufferedImage outline(BufferedImage image, int radius, int maxAlpha, int rgb)
 	{
 		int width = image.getWidth() + radius * 2;
 		int height = image.getHeight() + radius * 2;
@@ -259,7 +286,7 @@ public class HitsplatSprites
 		{
 			if (alpha[index] > 0)
 			{
-				out.setRGB(index % width, index / width, alpha[index] << 24);
+				out.setRGB(index % width, index / width, (alpha[index] << 24) | rgb);
 			}
 		}
 
@@ -316,8 +343,68 @@ public class HitsplatSprites
 		return image.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
 	}
 
-	private static BufferedImage loadImage(String directory, String fileName)
+	private static Filepath prepareOverrideDirectory(Supplier<Filepath> overrides)
 	{
+		Filepath root;
+		try
+		{
+			root = overrides.get();
+		}
+		catch (RuntimeException e)
+		{
+			log.debug("Unable to open the hitsplat override directory", e);
+			return null;
+		}
+
+		if (root == null)
+		{
+			return null;
+		}
+
+		for (HitsplatStyle style : HitsplatStyle.values())
+		{
+			createDirectory(root, style.getDirectory());
+		}
+
+		for (HitsplatIconSet set : HitsplatIconSet.values())
+		{
+			createDirectory(root, ICON_DIRECTORY + "/" + set.getDirectory());
+		}
+
+		return root;
+	}
+
+	private static void createDirectory(Filepath root, String directory)
+	{
+		try
+		{
+			resolve(root, directory).createDirectories();
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("Unable to create hitsplat override directory {}", directory, e);
+		}
+	}
+
+	private static Filepath resolve(Filepath root, String directory)
+	{
+		Filepath path = root;
+		for (String segment : directory.split("/"))
+		{
+			path = path.joinSegment(segment);
+		}
+
+		return path;
+	}
+
+	private static BufferedImage loadImage(Overrides overrideRoot, String directory, String fileName)
+	{
+		BufferedImage override = overrideRoot.load(directory, fileName);
+		if (override != null)
+		{
+			return override;
+		}
+
 		String path = RESOURCE_ROOT + directory + "/" + fileName + ".png";
 		if (HitsplatSprites.class.getResource(path) == null)
 		{
@@ -333,5 +420,115 @@ public class HitsplatSprites
 			log.debug("Unable to read hitsplat image {}", path, e);
 			return null;
 		}
+	}
+
+	private static final class Overrides
+	{
+		private final Filepath root;
+		private int applied;
+
+		private Overrides(Filepath root)
+		{
+			this.root = root;
+		}
+
+		private int getApplied()
+		{
+			return applied;
+		}
+
+		private StyleProperties loadProperties(HitsplatStyle style)
+		{
+			if (root == null)
+			{
+				return StyleProperties.defaults(style);
+			}
+
+			Filepath path;
+			try
+			{
+				path = resolve(root, style.getDirectory()).joinSegment(StyleProperties.FILE_NAME);
+				if (!path.isFile())
+				{
+					return StyleProperties.defaults(style);
+				}
+			}
+			catch (RuntimeException e)
+			{
+				log.debug("Unable to resolve hitsplat style properties for {}", style.getDirectory(), e);
+				return StyleProperties.defaults(style);
+			}
+
+			try (Reader reader = path.openReader())
+			{
+				Properties properties = new Properties();
+				properties.load(reader);
+
+				log.debug("Using hitsplat style properties {}", path);
+				applied++;
+				return StyleProperties.read(style, properties);
+			}
+			catch (IOException | RuntimeException e)
+			{
+				log.debug("Unable to read hitsplat style properties {}", path, e);
+				return StyleProperties.defaults(style);
+			}
+		}
+
+		private BufferedImage load(String directory, String fileName)
+		{
+			if (root == null)
+			{
+				return null;
+			}
+
+			Filepath path;
+			try
+			{
+				path = resolve(root, directory).joinSegment(fileName + ".png");
+				if (!path.isFile())
+				{
+					return null;
+				}
+			}
+			catch (RuntimeException e)
+			{
+				log.debug("Unable to resolve hitsplat override {}/{}", directory, fileName, e);
+				return null;
+			}
+
+			try (InputStream in = path.openInputStream())
+			{
+				BufferedImage image = ImageIO.read(in);
+				if (image == null)
+				{
+					log.debug("Hitsplat override {} is not an image", path);
+					return null;
+				}
+
+				log.debug("Using hitsplat override {}", path);
+				applied++;
+				return toArgb(image);
+			}
+			catch (IOException | RuntimeException e)
+			{
+				log.debug("Unable to read hitsplat override {}", path, e);
+				return null;
+			}
+		}
+	}
+
+	private static BufferedImage toArgb(BufferedImage image)
+	{
+		if (image.getType() == BufferedImage.TYPE_INT_ARGB)
+		{
+			return image;
+		}
+
+		BufferedImage out = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+		Graphics2D graphics = out.createGraphics();
+		graphics.drawImage(image, 0, 0, null);
+		graphics.dispose();
+		return out;
 	}
 }

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
@@ -45,6 +47,7 @@ import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -74,6 +77,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
 	private static final int MAX_NEW_RENDERS_PER_FRAME = 16;
+	private static final int MAX_REMEMBERED_ICONS = MAX_CACHED_ICONS / 2;
+	private static final int REMEMBERED_ICONS_PER_FRAME = 32;
+	private static final long REMEMBER_INTERVAL_MS = 30_000;
 	// An animation is at most 128 cycles long, so this is how much of one is kept at worst
 	private static final int MAX_ANIMATION_FRAMES = 32;
 	private static final int[] KEPT_CONTAINERS = {InventoryID.INV, InventoryID.WORN};
@@ -430,6 +436,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Nullable
 	private ItemIconCache iconCache;
 	@Nullable
+	private CompletableFuture<ItemIconCache.Remembered> remembered;
+	private int rememberedLoaded;
+	private long account = -1;
+	private boolean iconsChanged;
+	private long lastRemembered;
+	@Nullable
 	private volatile RotationEditorDialog openRotationDialog;
 
 	private final Map<Long, RenderedIcon> renderedIcons = new LinkedHashMap<>(MAX_CACHED_ICONS, .75f, true) {
@@ -573,6 +585,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		iconCacheDirectory = null;
 		iconCache = null;
+		remembered = null;
+		account = -1;
 		renderedIcons.clear();
 		referenceIcons.clear();
 		resolvedStackModels.clear();
@@ -610,7 +624,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		draggedThisHook = null;
 		patchBuffersUsed = 0;
 
-		double brightness = client.getTextureProvider().getBrightness();
+		// The same brightness reads as 0.8 before logging in and as a float after
+		double brightness = (float) client.getTextureProvider().getBrightness();
 		IconQuality quality = config.iconQuality();
 		boolean customRotationsEnabled = config.customRotationsEnabled();
 		// Icons are sharpened only when the interface is stretched, so they can't be shared
@@ -627,6 +642,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 			lastKnownCustomRotationsEnabled = customRotationsEnabled;
 			lastKnownStretched = stretched;
 			lastKnownAnimateTextures = animateTextures;
+			remember();
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
@@ -634,11 +650,88 @@ public class HdItemIcons extends WidgetItemOverlay {
 				: new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, animateTextures, PATCH_SIZE);
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
+			account = client.getAccountHash();
+			startRemembered();
 		}
+
+		// Not on the login screen, so a logout keeps the icons until another account logs in
+		long newAccount = client.getAccountHash();
+		if (newAccount != -1 && newAccount != account) {
+			remember();
+			account = newAccount;
+			renderedIcons.clear();
+			settledContainers.clear();
+			startRemembered();
+		}
+		loadRemembered();
+		if (iconsChanged && System.currentTimeMillis() - lastRemembered > REMEMBER_INTERVAL_MS)
+			remember();
 
 		animationCycle = client.getGameCycle();
 		// Every frame, so icons are prepared as soon as the game sends the items, not once an interface shows them
 		prefetchQueuedContainers();
+	}
+
+	@Subscribe
+	public void onClientShutdown(ClientShutdown event) {
+		if (!iconsChanged)
+			return;
+		// Not on the client thread, which may still be drawing
+		try {
+			CompletableFuture<Void> written = remember();
+			if (written != null)
+				event.waitFor(written);
+		} catch (ConcurrentModificationException ignored) {
+		}
+	}
+
+	private void startRemembered() {
+		long account = this.account;
+		ItemIconCache cache = iconCache;
+		remembered = account == -1 || cache == null ? null
+			: CompletableFuture.supplyAsync(() -> cache.loadRemembered(account), renderExecutor);
+		rememberedLoaded = 0;
+	}
+
+	// Icons shown last time are loaded from the start, so they don't pop in the first time they're shown
+	private void loadRemembered() {
+		if (remembered == null || !remembered.isDone())
+			return;
+		ItemIconCache.Remembered kept = remembered.join();
+		for (int i = 0; i < REMEMBERED_ICONS_PER_FRAME && rememberedLoaded < kept.fingerprints.length; i++) {
+			long fingerprint = kept.fingerprints[rememberedLoaded];
+			int itemId = kept.itemIds[rememberedLoaded++];
+			if (renderedIcons.containsKey(fingerprint))
+				continue;
+			RenderedIcon icon = new RenderedIcon();
+			icon.itemId = itemId;
+			renderedIcons.put(fingerprint, icon);
+			loadIcon(icon, iconCache, fingerprint);
+		}
+		if (rememberedLoaded == kept.fingerprints.length)
+			remembered = null;
+	}
+
+	@Nullable
+	private CompletableFuture<Void> remember() {
+		lastRemembered = System.currentTimeMillis();
+		// Not while still loading what was remembered, which would be forgotten
+		ItemIconCache cache = iconCache;
+		if (cache == null || account == -1 || remembered != null)
+			return null;
+		iconsChanged = false;
+		// Most recently shown last
+		List<Map.Entry<Long, RenderedIcon>> shown = new ArrayList<>(renderedIcons.entrySet());
+		int count = Math.min(shown.size(), MAX_REMEMBERED_ICONS);
+		long[] fingerprints = new long[count];
+		int[] itemIds = new int[count];
+		for (int i = 0; i < count; i++) {
+			var entry = shown.get(shown.size() - 1 - i);
+			fingerprints[i] = entry.getKey();
+			itemIds[i] = entry.getValue().itemId;
+		}
+		long account = this.account;
+		return CompletableFuture.runAsync(() -> cache.remember(account, new ItemIconCache.Remembered(fingerprints, itemIds)), renderExecutor);
 	}
 
 	/**
@@ -965,6 +1058,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 			icon = new RenderedIcon();
 			icon.itemId = itemId;
 			renderedIcons.put(reference.fingerprint, icon);
+			iconsChanged = true;
 			if (iconCache != null) {
 				loadIcon(icon, iconCache, reference.fingerprint);
 				return icon;

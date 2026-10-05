@@ -827,6 +827,9 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		Rectangle onScreen = bounds.intersection(widget.getParent().getBounds());
 		boolean isDragged = widget == client.getDraggedWidget();
+		// The game only reports items inside its clip, so the parent is still where it was before it was shown
+		if (onScreen.isEmpty() && !isDragged)
+			onScreen = bounds;
 		// Some interfaces report their items twice. The dragged item can be anywhere over the others.
 		if (onScreen.isEmpty() || !isDragged && !paintedThisFrame.add(bounds))
 			return null;

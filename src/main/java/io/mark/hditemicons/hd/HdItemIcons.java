@@ -44,6 +44,7 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
+import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -888,10 +889,11 @@ public class HdItemIcons extends WidgetItemOverlay {
 				return false;
 			placed.drawnByGame = nextPatchBuffer();
 			Arrays.fill(placed.drawnByGame, 0);
-			if (backdropFrame == frameCount && placed.bounds.equals(backdropBounds)) {
-				BufferProvider frame = client.getBufferProvider();
+			BufferProvider frame = client.getBufferProvider();
+			if (backdropFrame == frameCount && placed.bounds.equals(backdropBounds))
 				takeOutGameDraggedItem(frame.getPixels(), frame.getWidth(), placed, backdrop);
-			}
+			else if (isDrawnInPlace(draggedWidget))
+				takeOutGameDraggedItem(frame.getPixels(), frame.getWidth(), placed, underDraggedInPlace(placed));
 			dragged = placed;
 			return true;
 		}
@@ -910,6 +912,48 @@ public class HdItemIcons extends WidgetItemOverlay {
 				backdrop[patchIndex(x - bounds.x, y - bounds.y)] = framePixels[y * frame.getWidth() + x];
 		backdropBounds.setBounds(bounds);
 		backdropFrame = frameCount;
+	}
+
+	// The bank draws its dragged item within its own layer, so it's already there when the layer's done
+	private static boolean isDrawnInPlace(Widget widget) {
+		int group = WidgetUtil.componentToInterface(widget.getId());
+		return group == WidgetUtil.componentToInterface(InterfaceID.Bankmain.ITEMS)
+			|| group == WidgetUtil.componentToInterface(InterfaceID.SharedBank.ITEMS);
+	}
+
+	/**
+	 * What the game drew its dragged item over, from how it's half see-through over it. Where its icon is the item
+	 * itself that's exact. Its shadow and count are filled in from around them.
+	 */
+	private int[] underDraggedInPlace(PlacedIcon placed) {
+		BufferProvider frame = client.getBufferProvider();
+		int[] framePixels = frame.getPixels();
+		int frameWidth = frame.getWidth();
+		ReferenceIcon reference = placed.reference;
+		Arrays.fill(patchColor, 0);
+		Arrays.fill(patchResolved, false);
+		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
+			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
+				int drawn = framePixels[y * frameWidth + x];
+				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+				if (reference.has(patch, FLAG_STACK_TEXT) || reference.has(patch, FLAG_SHADOW)) {
+					patchColor[patch] = drawn;
+				} else if (reference.has(patch, FLAG_ITEM)) {
+					int game = reference.plainPixels[(y - placed.bounds.y) * ICON_WIDTH + x - placed.bounds.x];
+					patchColor[patch] = unblendDragged(drawn, 0xFF000000 | game);
+					patchResolved[patch] = true;
+				} else {
+					patchColor[patch] = drawn;
+					patchResolved[patch] = true;
+				}
+			}
+		}
+		for (int pass = 0; pass < INPAINT_PASSES; pass++)
+			if (!spreadKnownColorsOnce())
+				break;
+		int[] under = nextPatchBuffer();
+		System.arraycopy(patchColor, 0, under, 0, PATCH_SIZE);
+		return under;
 	}
 
 	/**

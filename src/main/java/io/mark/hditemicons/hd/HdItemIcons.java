@@ -46,9 +46,11 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -104,10 +106,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private static final int[] NEIGHBOR_DX = {-1, 1, 0, 0};
 	private static final int[] NEIGHBOR_DY = {0, 0, -1, 1};
 
+	private static final String BLINDFOLD_GROUP = "blindfold";
+	private static final String BLINDFOLD_SHOW_UI = "enableUI";
+
 	private static final int[] INVENTORY_LIKE_INTERFACES = {
 		InterfaceID.INVENTORY, InterfaceID.WORNITEMS, InterfaceID.EQUIPMENT_SIDE,
 		InterfaceID.BANKSIDE, InterfaceID.SHARED_BANK_SIDE, InterfaceID.BANK_DEPOSITBOX,
-		InterfaceID.SHOPSIDE,
+		InterfaceID.SHOPSIDE,InterfaceID.SHOPMAIN
 	};
 	// The layers holding their items, drawn before the game draws the dragged item over them
 	private static final int[] INVENTORY_LIKE_ITEM_LAYERS = {
@@ -415,6 +420,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private final EventBus eventBus;
 	private final OverlayManager overlayManager;
 	private final ClientThread clientThread;
+	private final ConfigManager configManager;
 	private final HdItemIconsConfig config;
 	private final CustomRotationStorage rotationStorage;
 	private final ItemRenderSheet itemRenderSheet;
@@ -431,6 +437,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private boolean lastKnownCustomRotationsEnabled = true;
 	private boolean lastKnownStretched;
 	private boolean lastKnownAnimateTextures = true;
+	private boolean blindfoldHidesUi;
 	private int animationCycle;
 	@Nullable
 	private Filepath iconCacheDirectory;
@@ -501,11 +508,13 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	@Inject
 	public HdItemIcons(Client client, EventBus eventBus, OverlayManager overlayManager, ClientThread clientThread,
-						HdItemIconsConfig config, CustomRotationStorage rotationStorage, ItemRenderSheet itemRenderSheet) {
+						ConfigManager configManager, HdItemIconsConfig config, CustomRotationStorage rotationStorage,
+						ItemRenderSheet itemRenderSheet) {
 		this.client = client;
 		this.eventBus = eventBus;
 		this.overlayManager = overlayManager;
 		this.clientThread = clientThread;
+		this.configManager = configManager;
 		this.config = config;
 		this.rotationStorage = rotationStorage;
 		this.itemRenderSheet = itemRenderSheet;
@@ -542,6 +551,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		}
 
 		active = true;
+		blindfoldHidesUi = readBlindfoldHidesUi();
 		eventBus.register(this);
 		clientThread.invoke(() -> {
 			// clientThread.invoke() just queues this for the next client tick if we're not
@@ -610,7 +620,22 @@ public class HdItemIcons extends WidgetItemOverlay {
 		lastKnownCustomRotationsEnabled = true;
 		lastKnownStretched = false;
 		lastKnownAnimateTextures = true;
+		blindfoldHidesUi = false;
 		animationCycle = 0;
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (BLINDFOLD_GROUP.equals(event.getGroup()) && BLINDFOLD_SHOW_UI.equals(event.getKey()))
+			blindfoldHidesUi = readBlindfoldHidesUi();
+	}
+
+	private boolean readBlindfoldHidesUi() {
+		return "false".equals(configManager.getConfiguration(BLINDFOLD_GROUP, BLINDFOLD_SHOW_UI));
+	}
+
+	private boolean uiWipedByBlindfold() {
+		return blindfoldHidesUi && client.isGpu();
 	}
 
 	@Subscribe
@@ -761,7 +786,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	@Override
 	public Dimension render(Graphics2D graphics) {
-		if (!active)
+		if (!active || uiWipedByBlindfold())
 			return null;
 		boolean draggedHere = placeDraggedItem();
 		super.render(graphics);
@@ -804,6 +829,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 		Widget widget = widgetItem.getWidget();
 		Rectangle bounds = widgetItem.getCanvasBounds();
 		if (bounds.width != ICON_WIDTH || bounds.height != ICON_HEIGHT)
+			return null;
+		if (widget.isHidden())
 			return null;
 
 		int itemId = widgetItem.getId();

@@ -11,6 +11,7 @@ import net.runelite.api.Texture;
 import net.runelite.api.TextureProvider;
 
 import static io.mark.hditemicons.hd.IconMath.ceilToInt;
+import static io.mark.hditemicons.hd.IconMath.clampDouble;
 import static io.mark.hditemicons.hd.IconMath.clampInt;
 import static io.mark.hditemicons.hd.IconMath.decodeHsl;
 import static io.mark.hditemicons.hd.IconMath.floorToInt;
@@ -181,6 +182,9 @@ class ItemIconRasterizer {
 	private final int supersample;
 	private final double[] posX, posY, posZ;
 	private double centerOffsetX, centerOffsetY, cameraDistance;
+	// The game's own icon once ours is fitted to it, whose pixels the outlined icon fills
+	@Nullable
+	private int[] gameShape;
 	// The baseline every camera placement starts from, before any pan is layered on top.
 	private final double naturalOffsetX, naturalOffsetY;
 
@@ -280,6 +284,7 @@ class ItemIconRasterizer {
 	 */
 	void placeExplicitly(double cameraDistance, double offsetX, double offsetY) {
 		this.cameraDistance = cameraDistance;
+		gameShape = null;
 		this.centerOffsetX = naturalOffsetX + offsetX;
 		this.centerOffsetY = naturalOffsetY + offsetY;
 	}
@@ -316,7 +321,8 @@ class ItemIconRasterizer {
 			if (current.coverage == 0)
 				return false;
 
-			double scale = current.spread / target.spread;
+			// A start far too far away leaves a dot too small to measure its spread
+			double scale = current.spread >= .5 ? current.spread / target.spread : Math.sqrt(current.coverage / target.coverage);
 			cameraDistance *= scale;
 			centerOffsetX += (target.centerX - current.centerX) * cameraDistance / PROJECTION_SCALE;
 			centerOffsetY += (target.centerY - current.centerY) * cameraDistance / PROJECTION_SCALE;
@@ -331,7 +337,9 @@ class ItemIconRasterizer {
 		}
 
 		int[] fitted = renderSamples(cameraDistance, 1, 1, 0, 0, ICON_WIDTH, ICON_HEIGHT, palette);
-		return verifiesAgainst(fitted, reference, target.coverage);
+		boolean fits = verifiesAgainst(fitted, reference, target.coverage);
+		gameShape = fits ? reference : null;
+		return fits;
 	}
 
 	private static final class Silhouette {
@@ -463,7 +471,15 @@ class ItemIconRasterizer {
 		int[] shaded = sharpen ? sharpen(pixels, width, height) : pixels;
 		// Outlined off the unsharpened pixels: sharpening nudges alpha across the threshold
 		// filled() tests, which would otherwise reshape the ring depending on the setting
-		return outlined ? outline(pixels, shaded, width, height) : shaded;
+		if (!outlined)
+			return shaded;
+		if (gameShape == null)
+			return outline(pixels, shaded, width, height);
+		boolean[] filled = new boolean[width * height];
+		for (int y = 0; y < ICON_HEIGHT; y++)
+			for (int x = 0; x < ICON_WIDTH; x++)
+				filled[(y + marginPixels) * width + x + marginPixels] = gameShape[y * ICON_WIDTH + x] != 0;
+		return outline(pixels, shaded, filled, width, height);
 	}
 
 	/**
@@ -531,6 +547,62 @@ class ItemIconRasterizer {
 			else if (ring[i])
 				outlined[i] = 0xFF000000;
 		}
+		return outlined;
+	}
+
+	/**
+	 * At the game's resolution a pixel off is a piece missing, so the pixels the game fills are filled, in our colours.
+	 * Where ours barely or doesn't reach, the colour is taken as if it covered the pixel, or from its neighbours.
+	 */
+	private static int[] outline(int[] shape, int[] pixels, boolean[] filled, int width, int height) {
+		boolean[] ring = ring(filled, width, height);
+		int[] outlined = new int[pixels.length];
+		boolean[] unknown = new boolean[pixels.length];
+		for (int i = 0; i < pixels.length; i++) {
+			int coverage = shape[i] >>> 24;
+			if (filled[i] && coverage >= 128)
+				outlined[i] = over(pixels[i], 0xFF000000);
+			else if (filled[i] && coverage > 0)
+				outlined[i] = opaque(pixels[i], coverage);
+			else if (filled[i])
+				unknown[i] = true;
+			else if (ring[i])
+				outlined[i] = 0xFF000000;
+		}
+
+		for (boolean spreading = true; spreading; ) {
+			spreading = false;
+			int[] spread = outlined.clone();
+			for (int y = 0; y < height; y++) {
+				for (int x = 0; x < width; x++) {
+					int i = y * width + x;
+					if (!unknown[i])
+						continue;
+					int count = 0, r = 0, g = 0, b = 0;
+					for (int n = 0; n < NEIGHBOR_X.length; n++) {
+						int nx = x + NEIGHBOR_X[n], ny = y + NEIGHBOR_Y[n];
+						int neighbor = ny * width + nx;
+						if (nx < 0 || nx >= width || ny < 0 || ny >= height || !filled[neighbor] || unknown[neighbor])
+							continue;
+						r += outlined[neighbor] >> 16 & 0xFF;
+						g += outlined[neighbor] >> 8 & 0xFF;
+						b += outlined[neighbor] & 0xFF;
+						count++;
+					}
+					if (count > 0) {
+						spread[i] = 0xFF000000 | r / count << 16 | g / count << 8 | b / count;
+						spreading = true;
+					}
+				}
+			}
+			for (int i = 0; i < spread.length; i++)
+				if (unknown[i] && spread[i] != 0)
+					unknown[i] = false;
+			outlined = spread;
+		}
+		for (int i = 0; i < outlined.length; i++)
+			if (unknown[i])
+				outlined[i] = 0xFF000000;
 		return outlined;
 	}
 
@@ -652,6 +724,15 @@ class ItemIconRasterizer {
 		return result;
 	}
 
+	/**
+	 * The game rounds projected positions toward the origin, which pulls parts away from the
+	 * middle of the icon in by half a pixel on average, like the seeds of a stack. Followed
+	 * smoothly, and the middle is left as it is.
+	 */
+	private static double towardOrigin(double pixels) {
+		return pixels - .5 * Math.signum(pixels) * clampDouble(Math.abs(pixels) - 1, 0, 1);
+	}
+
 	private int[] renderSamples(double distance, double scaleX, double scaleY, double left, double top,
 								int width, int height, int[] palette) {
 		int vertexCount = posX.length;
@@ -659,8 +740,8 @@ class ItemIconRasterizer {
 			camX[i] = posX[i] + centerOffsetX;
 			camY[i] = posY[i] + centerOffsetY;
 			camZ[i] = posZ[i] + distance;
-			screenX[i] = (PROJECTION_ORIGIN + PROJECTION_SCALE * camX[i] / camZ[i] - left) * scaleX * supersample;
-			screenY[i] = (PROJECTION_ORIGIN + PROJECTION_SCALE * camY[i] / camZ[i] - top) * scaleY * supersample;
+			screenX[i] = (PROJECTION_ORIGIN + towardOrigin(PROJECTION_SCALE * camX[i] / camZ[i]) - left) * scaleX * supersample;
+			screenY[i] = (PROJECTION_ORIGIN + towardOrigin(PROJECTION_SCALE * camY[i] / camZ[i]) - top) * scaleY * supersample;
 		}
 		double rayScaleX = 1 / (scaleX * supersample), rayOffsetX = left - PROJECTION_ORIGIN;
 		double rayScaleY = 1 / (scaleY * supersample), rayOffsetY = top - PROJECTION_ORIGIN;

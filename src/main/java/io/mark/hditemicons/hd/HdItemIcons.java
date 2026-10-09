@@ -4,8 +4,11 @@ import io.mark.hditemicons.CustomRotation;
 import io.mark.hditemicons.CustomRotationStorage;
 import io.mark.hditemicons.HdItemIconsConfig;
 import io.mark.hditemicons.IconCacheStorage;
+import io.mark.hditemicons.IconEditorHost;
 import io.mark.hditemicons.IconQuality;
 import io.mark.hditemicons.ItemRenderSheet;
+import io.mark.hditemicons.NamedItem;
+import io.mark.hditemicons.SimilarItems;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
@@ -19,11 +22,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -47,6 +53,7 @@ import net.runelite.api.widgets.WidgetItem;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.game.ItemVariationMapping;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
@@ -75,7 +82,7 @@ import static io.mark.hditemicons.hd.ItemIconRasterizer.ICON_WIDTH;
  */
 @Slf4j
 @Singleton
-public class HdItemIcons extends WidgetItemOverlay {
+public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private static final int MAX_CACHED_ICONS = 2048;
 	private static final int MAX_CACHED_REFERENCES = 2048;
 	private static final int MAX_CACHED_STACK_MODELS = 512;
@@ -108,6 +115,10 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 	private static final String BLINDFOLD_GROUP = "blindfold";
 	private static final String BLINDFOLD_SHOW_UI = "enableUI";
+
+	private static final int SIDE_PANEL_PREVIEW_SCALE = 5;
+	private static final Pattern SUFFIX_IN_BRACKETS = Pattern.compile("\\s*\\([^)]*\\)$");
+	private static final Pattern TRAILING_NUMBER = Pattern.compile("\\s+\\d+$");
 
 	private static final int[] INVENTORY_LIKE_INTERFACES = {
 		InterfaceID.INVENTORY, InterfaceID.WORNITEMS, InterfaceID.EQUIPMENT_SIDE,
@@ -424,6 +435,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private final HdItemIconsConfig config;
 	private final CustomRotationStorage rotationStorage;
 	private final ItemRenderSheet itemRenderSheet;
+	private final IconEditorSidePanel sidePanel;
 	private final OverlayCapture overlayCapture = new OverlayCapture();
 	private final DraggedItemPainter draggedItemPainter = new DraggedItemPainter();
 	private final DraggedItemBackdrop draggedItemBackdrop = new DraggedItemBackdrop();
@@ -439,6 +451,8 @@ public class HdItemIcons extends WidgetItemOverlay {
 	private boolean lastKnownAnimateTextures = true;
 	private boolean blindfoldHidesUi;
 	private int animationCycle;
+	@Nullable
+	private List<NamedItem> itemIndex;
 	@Nullable
 	private Filepath iconCacheDirectory;
 	@Nullable
@@ -509,7 +523,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 	@Inject
 	public HdItemIcons(Client client, EventBus eventBus, OverlayManager overlayManager, ClientThread clientThread,
 						ConfigManager configManager, HdItemIconsConfig config, CustomRotationStorage rotationStorage,
-						ItemRenderSheet itemRenderSheet) {
+						ItemRenderSheet itemRenderSheet, IconEditorSidePanel sidePanel) {
 		this.client = client;
 		this.eventBus = eventBus;
 		this.overlayManager = overlayManager;
@@ -518,6 +532,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		this.config = config;
 		this.rotationStorage = rotationStorage;
 		this.itemRenderSheet = itemRenderSheet;
+		this.sidePanel = sidePanel;
 		for (int groupId : INVENTORY_LIKE_INTERFACES)
 			drawAfterInterface(groupId);
 		drawAfterLayer(InterfaceID.Bankmain.ITEMS);
@@ -552,6 +567,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 
 		active = true;
 		blindfoldHidesUi = readBlindfoldHidesUi();
+		sidePanel.setHost(this);
 		eventBus.register(this);
 		clientThread.invoke(() -> {
 			// clientThread.invoke() just queues this for the next client tick if we're not
@@ -579,6 +595,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		if (!active)
 			return;
 		active = false;
+		sidePanel.setHost(null);
 		eventBus.unregister(this);
 		overlayManager.remove(this);
 		overlayManager.remove(overlayCapture);
@@ -622,6 +639,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 		lastKnownAnimateTextures = true;
 		blindfoldHidesUi = false;
 		animationCycle = 0;
+		itemIndex = null;
 	}
 
 	@Subscribe
@@ -1130,7 +1148,7 @@ public class HdItemIcons extends WidgetItemOverlay {
 				return PENDING;
 
 			icon = new RenderedIcon();
-			icon.itemId = itemId;
+			icon.itemId = placedAs(itemId);
 			renderedIcons.put(reference.fingerprint, icon);
 			iconsChanged = true;
 			if (iconCache != null) {
@@ -1246,6 +1264,12 @@ public class HdItemIcons extends WidgetItemOverlay {
 			reference = new ReferenceIcon(itemId, borderWidth, config.iconQuality().getSupersample(), plain, withCount);
 		referenceIcons.put(key, reference);
 		return reference;
+	}
+
+	private int placedAs(int itemId) {
+		ItemComposition definition = client.getItemDefinition(itemId);
+		return definition.getPlaceholderTemplateId() != -1 && definition.getPlaceholderId() != -1
+			? definition.getPlaceholderId() : itemId;
 	}
 
 	// Stacks like coins and arrows show the model of an unnamed item, which the API doesn't expose
@@ -1425,10 +1449,11 @@ public class HdItemIcons extends WidgetItemOverlay {
 	}
 
 	/** Called from the menu entry's click handler, which already runs on the client thread. */
-	public void openRotationEditor(int itemId) {
+	public void openRotationEditor(int pickedItemId) {
 		if (!active || Double.isNaN(lastKnownBrightness))
 			return;
 
+		int itemId = placedAs(pickedItemId);
 		ItemComposition item = client.getItemDefinition(itemId);
 		ItemIconRasterizer.IconModel iconModel = captureModel(item);
 		if (iconModel == null)
@@ -1443,15 +1468,18 @@ public class HdItemIcons extends WidgetItemOverlay {
 			sheetDefault.resizeX, sheetDefault.resizeY, sheetDefault.resizeZ);
 		CustomRotation existing = rotationStorage.get(itemId);
 		CustomRotation initial = existing != null ? existing : defaults;
-		String name = item.getName();
-		List<RotationEditorDialog.Preset> presets = savedIconPresets(itemId);
 		int[] referencePixels = fetchGamePixels(itemId, 1, 0, ItemQuantityMode.NEVER, false);
+		RotationEditorPanel.Session session = new RotationEditorPanel.Session(itemId, nameOf(itemId), initial,
+			defaults, savedIconPresets(itemId), iconModel, referencePixels, palette, supersample);
 
 		SwingUtilities.invokeLater(() -> {
 			if (!active)
 				return;
-			RotationEditorDialog dialog = new RotationEditorDialog(name, itemId, initial, defaults, presets,
-				iconModel, referencePixels, palette, supersample, rotationStorage, this::onRotationChanged);
+			if (sidePanel.isAttached()) {
+				sidePanel.open(new RotationEditorPanel(session, rotationStorage, this, SIDE_PANEL_PREVIEW_SCALE));
+				return;
+			}
+			RotationEditorDialog dialog = new RotationEditorDialog(session, rotationStorage, this);
 			openRotationDialog = dialog;
 			dialog.setVisible(true);
 		});
@@ -1461,25 +1489,111 @@ public class HdItemIcons extends WidgetItemOverlay {
 	 * Every other item with a saved rotation, to be offered as presets to copy. Client thread
 	 * only, for the item names.
 	 */
-	private List<RotationEditorDialog.Preset> savedIconPresets(int editingItemId) {
-		List<RotationEditorDialog.Preset> presets = new ArrayList<>();
+	private List<RotationEditorPanel.Preset> savedIconPresets(int editingItemId) {
+		List<RotationEditorPanel.Preset> presets = new ArrayList<>();
 		int itemCount = client.getItemCount();
 		for (Map.Entry<Integer, CustomRotation> saved : rotationStorage.all().entrySet()) {
 			int itemId = saved.getKey();
 			// A saved id can outlive the item, if the game's cache changed under it
 			if (itemId == editingItemId || itemId < 0 || itemId >= itemCount)
 				continue;
-			String name = client.getItemDefinition(itemId).getName();
-			if (name == null || name.isEmpty() || "null".equals(name))
-				name = "Item";
-			presets.add(new RotationEditorDialog.Preset(name + " (" + itemId + ")", saved.getValue()));
+			presets.add(new RotationEditorPanel.Preset(nameOf(itemId) + " (" + itemId + ")", saved.getValue()));
 		}
 		presets.sort(Comparator.comparing(Object::toString, String.CASE_INSENSITIVE_ORDER));
 		return presets;
 	}
 
-	private void onRotationChanged(int itemId) {
-		clientThread.invoke(() -> clearRenderCache(itemId));
+	@Override
+	public void iconsChanged(Collection<Integer> itemIds) {
+		List<Integer> copy = List.copyOf(itemIds);
+		clientThread.invoke(() -> clearRenderCache(copy));
+	}
+
+	@Override
+	public void allIconsChanged() {
+		clientThread.invoke(() -> clearRenderCache());
+	}
+
+	@Override
+	public void findSimilarItems(int itemId, Consumer<SimilarItems> onFound) {
+		clientThread.invoke(() -> {
+			SimilarItems found = similarItems(itemId);
+			SwingUtilities.invokeLater(() -> onFound.accept(found));
+		});
+	}
+
+	@Override
+	public void itemIndex(Consumer<List<NamedItem>> onReady) {
+		clientThread.invoke(() -> {
+			List<NamedItem> index = itemIndex();
+			SwingUtilities.invokeLater(() -> onReady.accept(index));
+		});
+	}
+
+	@Override
+	public void editItem(int itemId) {
+		clientThread.invoke(() -> openRotationEditor(itemId));
+	}
+
+	private List<NamedItem> itemIndex() {
+		List<NamedItem> index = itemIndex;
+		if (index != null)
+			return index;
+
+		int itemCount = client.getItemCount();
+		index = new ArrayList<>();
+		for (int itemId = 0; itemId < itemCount; itemId++) {
+			ItemComposition definition = client.getItemDefinition(itemId);
+			if (definition.getNote() != -1 || definition.getPlaceholderTemplateId() != -1)
+				continue;
+			String name = definition.getName();
+			if (name == null || name.isEmpty() || "null".equals(name))
+				continue;
+			index.add(new NamedItem(itemId, name));
+		}
+		if (!index.isEmpty())
+			itemIndex = index;
+		return index;
+	}
+
+	private SimilarItems similarItems(int itemId) {
+		Set<Integer> variants = new HashSet<>(ItemVariationMapping.getVariations(ItemVariationMapping.map(itemId)));
+		variants.remove(itemId);
+
+		String[] target = significantWords(nameOf(itemId));
+		List<NamedItem> found = new ArrayList<>();
+		for (NamedItem candidate : itemIndex())
+			if (variants.contains(candidate.id)
+				|| target.length > 0 && readsAsVariant(target, significantWords(candidate.name)))
+				found.add(candidate);
+
+		found.sort(Comparator.comparing((NamedItem item) -> !variants.contains(item.id))
+			.thenComparing(item -> item.name, String.CASE_INSENSITIVE_ORDER)
+			.thenComparingInt(item -> item.id));
+		return new SimilarItems(found, variants);
+	}
+
+	private static boolean readsAsVariant(String[] target, String[] candidate) {
+		if (candidate.length == 0 || !target[target.length - 1].equals(candidate[candidate.length - 1]))
+			return false;
+		if (target.length == 1 || candidate.length == 1)
+			return target.length == candidate.length;
+		for (int i = 0; i < target.length - 1; i++)
+			for (int j = 0; j < candidate.length - 1; j++)
+				if (target[i].equals(candidate[j]))
+					return true;
+		return false;
+	}
+
+	private static String[] significantWords(String name) {
+		String stripped = SUFFIX_IN_BRACKETS.matcher(name.toLowerCase(Locale.ROOT).trim()).replaceAll("");
+		stripped = TRAILING_NUMBER.matcher(stripped).replaceAll("").trim();
+		return stripped.isEmpty() ? new String[0] : stripped.split("\\s+");
+	}
+
+	private String nameOf(int itemId) {
+		String name = client.getItemDefinition(itemId).getName();
+		return name == null || name.isEmpty() || "null".equals(name) ? "Item" : name;
 	}
 
 	/** The cache is keyed by the game's own icon, which a saved rotation doesn't change. */

@@ -78,4 +78,15 @@ public interface HdItemIconsConfig extends Config {
 	default Keybind editRotationHotkey() {
 		return Keybind.SHIFT;
 	}
+
+	@ConfigItem(
+		keyName = "sidePanelEditor",
+		name = "Edit icons in the side panel",
+		description = "Adds an HQ Item Icons button to the side panel and edits icons there instead of in a"
+			+ " pop-up window. Picking \"Edit icon rotation\" on an item opens the panel on that item.",
+		position = 6
+	)
+	default boolean sidePanelEditor() {
+		return true;
+	}
 }

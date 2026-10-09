@@ -2,6 +2,7 @@ package io.mark.hditemicons;
 
 import com.google.inject.Provides;
 import io.mark.hditemicons.hd.HdItemIcons;
+import io.mark.hditemicons.hd.IconEditorSidePanel;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,6 +17,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PluginMessage;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
@@ -53,6 +55,9 @@ public class HdItemIconsPlugin extends Plugin {
 	@Inject
 	private HdItemIconsConfig config;
 
+	@Inject
+	private IconEditorSidePanel sidePanel;
+
 	@Provides
 	HdItemIconsConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(HdItemIconsConfig.class);
@@ -62,14 +67,28 @@ public class HdItemIconsPlugin extends Plugin {
 	protected void startUp() throws IOException {
 		hdItemIcons.startUp(getPluginDirectory());
 		keyManager.registerKeyListener(editRotationHotkeyListener);
+		if (config.sidePanelEditor())
+			sidePanel.attach();
 		eventBus.post(new PluginMessage(NAMESPACE, "startup", Map.of("plugin", getName())));
 	}
 
 	@Override
 	protected void shutDown() {
 		keyManager.unregisterKeyListener(editRotationHotkeyListener);
+		sidePanel.detach();
 		hdItemIcons.shutDown();
 		eventBus.post(new PluginMessage(NAMESPACE, "shutdown", Map.of("plugin", getName())));
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (!HdItemIconsConfig.GROUP.equals(event.getGroup()) || !"sidePanelEditor".equals(event.getKey()))
+			return;
+
+		if (config.sidePanelEditor())
+			sidePanel.attach();
+		else
+			sidePanel.detach();
 	}
 
 	@Subscribe

@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "name": "Example crystal icon",
+  "author": "HQ Item Icons contributors",
+  "items": {
+    "4151": {
+      "model": "models/crystal.obj",
+      "color": "#65dce8",
+      "camera": {
+        "pitch": 128,
+        "yaw": 256,
+        "zoom": 2200
+      }
+    }
+  }
+}

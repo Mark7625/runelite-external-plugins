@@ -43,7 +43,7 @@ class ItemIconRasterizer {
 			this.basePixels = basePixels;
 			this.direction = direction;
 			this.speed = speed;
-			this.size = basePixels.length == 64 * 64 ? 64 : 128;
+			this.size = (int) Math.sqrt(basePixels.length);
 		}
 
 		boolean scrolls() {
@@ -69,6 +69,8 @@ class ItemIconRasterizer {
 		@Nullable final int[] uvA, uvB, uvC;
 		@Nullable final IconTexture[] textures;
 		@Nullable final int[] textureByFace;
+		@Nullable final float[][] customUv;
+		@Nullable final int[] customColors;
 		final int animationPeriod;
 		final boolean animated;
 
@@ -78,6 +80,17 @@ class ItemIconRasterizer {
 						@Nullable byte[] alpha, @Nullable byte[] paintLayer,
 						@Nullable int[][] texelsByFace, @Nullable int[] uvA, @Nullable int[] uvB, @Nullable int[] uvC,
 						@Nullable IconTexture[] textures, @Nullable int[] textureByFace) {
+			this(vertexX, vertexY, vertexZ, triangleA, triangleB, triangleC, shadeA, shadeB, shadeC,
+				alpha, paintLayer, texelsByFace, uvA, uvB, uvC, textures, textureByFace, null, null);
+		}
+
+		private IconModel(float[] vertexX, float[] vertexY, float[] vertexZ,
+						int[] triangleA, int[] triangleB, int[] triangleC,
+						int[] shadeA, int[] shadeB, int[] shadeC,
+						@Nullable byte[] alpha, @Nullable byte[] paintLayer,
+						@Nullable int[][] texelsByFace, @Nullable int[] uvA, @Nullable int[] uvB, @Nullable int[] uvC,
+						@Nullable IconTexture[] textures, @Nullable int[] textureByFace,
+						@Nullable float[][] customUv, @Nullable int[] customColors) {
 			this.vertexX = vertexX;
 			this.vertexY = vertexY;
 			this.vertexZ = vertexZ;
@@ -95,6 +108,8 @@ class ItemIconRasterizer {
 			this.uvC = uvC;
 			this.textures = textures;
 			this.textureByFace = textureByFace;
+			this.customUv = customUv;
+			this.customColors = customColors;
 
 			int animationPeriod = 0;
 			if (textures != null)
@@ -103,6 +118,38 @@ class ItemIconRasterizer {
 						animationPeriod = Math.max(animationPeriod, texture.period());
 			this.animationPeriod = animationPeriod;
 			this.animated = animationPeriod > 1;
+		}
+
+		/** OBJ models are double-sided, flat-lit, with a single material and optional UV texture. */
+		static IconModel custom(ObjMesh mesh, int color, @Nullable int[] texture, int direction, int speed) {
+			int faces = mesh.a.length;
+			int[] shades = new int[faces], flat = new int[faces], colors = new int[faces];
+			Arrays.fill(flat, -1);
+			for (int f = 0; f < faces; f++) {
+				int a = mesh.a[f], b = mesh.b[f], c = mesh.c[f];
+				double ux = mesh.x[b] - mesh.x[a], uy = mesh.y[b] - mesh.y[a], uz = mesh.z[b] - mesh.z[a];
+				double vx = mesh.x[c] - mesh.x[a], vy = mesh.y[c] - mesh.y[a], vz = mesh.z[c] - mesh.z[a];
+				double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+				double length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+				double light = length == 0 ? 0 : Math.abs((-nx - ny - nz) / (length * Math.sqrt(3)));
+				int shade = (int) (140 + 115 * light);
+				shades[f] = shade / 2;
+				colors[f] = Math.max(1, applyShade(color, shade));
+			}
+			IconTexture[] textures = null;
+			int[][] texels = null;
+			int[] textureByFace = null;
+			if (texture != null) {
+				int[] pixels = texture.clone();
+				for (int i = 0; i < pixels.length; i++)
+					pixels[i] = (pixels[i] >>> 24) < 128 ? 0 : Math.max(1, pixels[i] & 0xffffff);
+				textures = new IconTexture[]{new IconTexture(pixels, direction, speed)};
+				texels = new int[faces][];
+				Arrays.fill(texels, pixels);
+				textureByFace = new int[faces];
+			}
+			return new IconModel(mesh.x, mesh.y, mesh.z, mesh.a, mesh.b, mesh.c, shades, shades, flat,
+				null, null, texels, null, null, null, textures, textureByFace, mesh.uv, colors);
 		}
 
 		/**
@@ -806,7 +853,7 @@ class ItemIconRasterizer {
 			if (model.shadeC[f] == -2)
 				continue; // hidden face
 			int a = model.triangleA[f], b = model.triangleB[f], c = model.triangleC[f];
-			if (isBackFacing(screenX, screenY, a, b, c))
+			if (model.customColors == null && isBackFacing(screenX, screenY, a, b, c))
 				continue;
 			int faceDepth = floorToInt((depth[a] + depth[b] + depth[c]) / 3);
 			// Pack so sorting by the key sorts by depth (descending) with the face index as a
@@ -907,8 +954,11 @@ class ItemIconRasterizer {
 		int[] texels = texelsByFace == null ? null : texelsByFace[face];
 		int textureSize = 0;
 		double[] planeU = null, planeV = null, planeW = null;
+		float[] customUv = model.customUv == null ? null : model.customUv[face];
 		if (texels != null) {
 			textureSize = (int) Math.sqrt(texels.length);
+		}
+		if (texels != null && customUv == null) {
 			double[] origin = corner(camX, camY, camZ, model.uvA[face]);
 			double[] edgeM = subtract(corner(camX, camY, camZ, model.uvB[face]), origin);
 			double[] edgeN = subtract(corner(camX, camY, camZ, model.uvC[face]), origin);
@@ -928,18 +978,29 @@ class ItemIconRasterizer {
 					continue;
 
 				int color;
-				if (texels == null) {
+				if (texels == null && model.customColors != null) {
+					color = model.customColors[face];
+				} else if (texels == null) {
 					int shade = clampInt(floorToInt(wa * shadeA + wb * shadeB + wc * shadeC), 0, 0xFFFF);
 					color = palette[flatShaded ? shadeA : shade];
 				} else {
-					double rayX = px * rayScaleX + rayOffsetX;
-					double rayY = py * rayScaleY + rayOffsetY;
-					double along = rayX * planeW[0] + rayY * planeW[1] + PROJECTION_SCALE * planeW[2];
-					double u = (rayX * planeU[0] + rayY * planeU[1] + PROJECTION_SCALE * planeU[2]) / along;
-					double v = (rayX * planeV[0] + rayY * planeV[1] + PROJECTION_SCALE * planeV[2]) / along;
+					double u, v;
+					if (customUv != null) {
+						double pa = wa / camZ[a], pb = wb / camZ[b], pc = wc / camZ[c];
+						double sum = pa + pb + pc;
+						u = (pa * customUv[0] + pb * customUv[2] + pc * customUv[4]) / sum;
+						v = (pa * customUv[1] + pb * customUv[3] + pc * customUv[5]) / sum;
+					} else {
+						double rayX = px * rayScaleX + rayOffsetX;
+						double rayY = py * rayScaleY + rayOffsetY;
+						double along = rayX * planeW[0] + rayY * planeW[1] + PROJECTION_SCALE * planeW[2];
+						u = (rayX * planeU[0] + rayY * planeU[1] + PROJECTION_SCALE * planeU[2]) / along;
+						v = (rayX * planeV[0] + rayY * planeV[1] + PROJECTION_SCALE * planeV[2]) / along;
+					}
 					int texel = texels[
 						wrap(floorToInt(v * textureSize), textureSize) * textureSize +
-							clampInt(floorToInt(u * textureSize), 0, textureSize - 1)];
+							(customUv == null ? clampInt(floorToInt(u * textureSize), 0, textureSize - 1)
+								: wrap(floorToInt(u * textureSize), textureSize))];
 					if (texel == 0)
 						continue;
 					int shade = (int) ((wa * shadeA + wb * shadeB + wc * shadeC) * 2);

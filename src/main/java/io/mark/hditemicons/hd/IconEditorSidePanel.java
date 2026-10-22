@@ -47,6 +47,7 @@ public class IconEditorSidePanel {
 	private final ClientToolbar clientToolbar;
 	private final ItemManager itemManager;
 	private final CustomRotationStorage storage;
+	private final ModelPackStorage modelPacks;
 
 	private volatile boolean attached;
 	@Nullable
@@ -61,10 +62,19 @@ public class IconEditorSidePanel {
 	private NavigationButton navigationButton;
 
 	@Inject
-	public IconEditorSidePanel(ClientToolbar clientToolbar, ItemManager itemManager, CustomRotationStorage storage) {
+	public IconEditorSidePanel(ClientToolbar clientToolbar, ItemManager itemManager, CustomRotationStorage storage,
+			ModelPackStorage modelPacks) {
 		this.clientToolbar = clientToolbar;
 		this.itemManager = itemManager;
 		this.storage = storage;
+		this.modelPacks = modelPacks;
+	}
+
+	void modelPackChanged() {
+		SwingUtilities.invokeLater(() -> {
+			if (holder != null)
+				holder.forget();
+		});
 	}
 
 	public void setHost(@Nullable IconEditorHost host) {
@@ -216,6 +226,7 @@ public class IconEditorSidePanel {
 			iconTab = new MaterialTab("Icon", tabs, ShareButtons.below(iconTabContent, share()));
 			tabs.addTab(iconTab);
 			tabs.addTab(new MaterialTab("Groups", tabs, ShareButtons.below(groupsTabContent, share())));
+			tabs.addTab(new MaterialTab("Models", tabs, new ModelPackPanel(modelPacks)));
 			tabs.setBorder(new EmptyBorder(0, 0, 8, 0));
 			tabs.select(iconTab);
 

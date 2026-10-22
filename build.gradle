@@ -70,3 +70,13 @@ tasks.register('shadowJar', Jar) {
 	archiveClassifier.set('shadow')
 	archiveFileName.set("${rootProject.name}-${project.version}-all.jar")
 }
+
+tasks.register('exampleModelPack', Zip) {
+	from 'examples/model-pack'
+	archiveFileName.set('example-model-pack.zip')
+	destinationDirectory.set(layout.buildDirectory.dir('distributions'))
+}
+
+tasks.named('processTestResources') {
+	from('examples/model-pack') { into 'model-pack' }
+}

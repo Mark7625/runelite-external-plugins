@@ -16,10 +16,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,8 +45,12 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
+import net.runelite.api.SpritePixels;
+import net.runelite.api.Texture;
+import net.runelite.api.WidgetNode;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.widgets.ItemQuantityMode;
@@ -120,6 +126,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private static final Pattern SUFFIX_IN_BRACKETS = Pattern.compile("\\s*\\([^)]*\\)$");
 	private static final Pattern TRAILING_NUMBER = Pattern.compile("\\s+\\d+$");
 
+	// Where other item overlays draw, so their items are drawn once the interface is. Other interfaces have theirs drawn
+	// right after their own layer, before the rest of the interface can draw over them.
 	private static final int[] INVENTORY_LIKE_INTERFACES = {
 		InterfaceID.INVENTORY, InterfaceID.WORNITEMS, InterfaceID.EQUIPMENT_SIDE,
 		InterfaceID.BANKSIDE, InterfaceID.SHARED_BANK_SIDE, InterfaceID.BANK_DEPOSITBOX,
@@ -129,6 +137,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private static final int[] INVENTORY_LIKE_ITEM_LAYERS = {
 		InterfaceID.Inventory.ITEMS, InterfaceID.EquipmentSide.ITEMS, InterfaceID.Bankside.ITEMS,
 		InterfaceID.SharedBankSide.ITEMS, InterfaceID.BankDepositbox.INVENTORY, InterfaceID.Shopside.ITEMS,
+		InterfaceID.RaidsStoragePrivate.ITEMS, InterfaceID.RaidsStorageShared.ITEMS, InterfaceID.RaidsStorageSide.ITEMS,
 	};
 
 	/**
@@ -161,11 +170,13 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private static final class ReferenceIcon {
 		final byte[] patchFlags = new byte[PATCH_SIZE];
 		final int[] plainPixels;
+		final int[] countPixels;
 		final long fingerprint;
 		int resolvedModelItemId = -1;
 
 		ReferenceIcon(int itemId, int borderWidth, int supersample, int[] plainPixels, int[] pixelsWithCount) {
 			this.plainPixels = plainPixels;
+			this.countPixels = pixelsWithCount;
 			this.fingerprint = fingerprintOf(itemId, borderWidth, supersample, plainPixels);
 
 			for (int y = 0; y < ICON_HEIGHT; y++) {
@@ -254,8 +265,12 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		int[] background;
 		int[] overlays;
 		int fill, outline;
-		// Whether everything other overlays drew over it is drawn with it, so the dragged item can go over it all
-		boolean takeAll;
+		// What's drawn over it there belongs to other items reaching into it, like the dragged one, or null if none do
+		@Nullable
+		boolean[] others;
+		// Where items drawn after it cover it, what's drawn over it stays in the interface, over them all, or null if none do
+		@Nullable
+		boolean[] covered;
 		// What's drawn under the interface
 		int[] drawn;
 		// The game's own icon for the dragged item, wherever it was found drawn
@@ -289,7 +304,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		Rectangle patchArea;
 		float opacity;
 		boolean overlaid;
-		boolean takeAll;
+		int fill, outline;
 		int lastUsed;
 
 		boolean holds(PlacedIcon placed, float opacity) {
@@ -326,6 +341,14 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			setPriority(PRIORITY_HIGHEST + 1);
 		}
 
+		void showOnInterface(int groupId) {
+			drawAfterInterface(groupId);
+		}
+
+		void showAfterLayer(int layerId) {
+			drawAfterLayer(layerId);
+		}
+
 		@Override
 		public Dimension render(Graphics2D graphics) {
 			BufferProvider frame = client.getBufferProvider();
@@ -333,20 +356,22 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			int frameWidth = frame.getWidth();
 			PlacedIcon draggedHere = draggedThisHook;
 			draggedThisHook = null;
+			boolean gpu = client.isGpu();
+			// The dragged item is drawn over the others, newest first
+			List<PlacedIcon> looked = new ArrayList<>(cutItems);
+			if (draggedHere != null && gpu)
+				looked.add(draggedHere);
+			// Each looks at what's drawn over it before any takes theirs out, as they can reach into each other
+			for (PlacedIcon placed : looked)
+				captureOverlays(framePixels, frameWidth, placed, looked);
+			for (PlacedIcon placed : looked)
+				takeOverlays(framePixels, frameWidth, placed);
 			for (PlacedIcon placed : cutItems) {
-				// The game draws the dragged item over what it's dragged over
-				placed.takeAll = draggedHere != null && draggedHere.patchArea.intersects(placed.patchArea);
-				captureOverlays(framePixels, frameWidth, placed);
 				placed.drawn = drawWithOverlays(placed);
 				drawnUnderInterface.add(placed);
 			}
 			cutItems.clear();
-			if (draggedHere == null)
-				return null;
-			if (client.isGpu()) {
-				draggedHere.takeAll = true;
-				captureOverlays(framePixels, frameWidth, draggedHere);
-			} else {
+			if (draggedHere != null && !gpu) {
 				// What the game draws the dragged item over, once the items under it are done
 				draggedHere.background = nextPatchBuffer();
 				readPatch(framePixels, frameWidth, draggedHere, draggedHere.background);
@@ -371,6 +396,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 
 		@Override
 		public Dimension render(Graphics2D graphics) {
+			placeDraggedItemLate();
 			drawDraggedItem();
 			return null;
 		}
@@ -385,6 +411,10 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 				drawAfterLayer(layerId);
 			// After the other overlays of the layer, which the game draws the dragged item over
 			setPriority(PRIORITY_HIGHEST + 1);
+		}
+
+		void showAfterLayer(int layerId) {
+			drawAfterLayer(layerId);
 		}
 
 		@Override
@@ -422,6 +452,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		}
 	}
 
+	private static final int SHOWN = 1;
+	private static final int CLIPPED = 2;
 	private static final int[] EMPTY_PATCH = new int[PATCH_SIZE];
 	private static final RenderedIcon PENDING = new RenderedIcon();
 	private static final ReferenceIcon UNRESOLVED =
@@ -493,6 +525,22 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		}
 	};
 	private final Map<Integer, Item[]> watchedContainers = new HashMap<>();
+	private final Map<Integer, Boolean> animatedItems = new HashMap<>();
+	// The game shades the items of a layer alike, the dragged one too
+	private final Map<Integer, Integer> itemShadows = new HashMap<>();
+	private final Set<Integer> standardHooks;
+	// Layers of other interfaces, whose items are drawn right after them
+	private final Set<Integer> itemLayers = new HashSet<>();
+	private final Set<Integer> newItemLayers = new HashSet<>();
+	private final Map<Integer, Boolean> drawnOnByOthers = new HashMap<>();
+	private final Map<Widget, Rectangle> visibleAreas = new IdentityHashMap<>();
+	private final Set<WidgetItem> coveredItems = Collections.newSetFromMap(new IdentityHashMap<>());
+	private final Map<Integer, List<Rectangle>> laterLayers = new HashMap<>();
+	private final List<PlacedIcon> placedThisHook = new ArrayList<>();
+	private boolean draggedLayerPassed;
+	// The dragged item as its own layer handed it over, before the game drew it, for when no later hook hands it over
+	@Nullable
+	private WidgetItem draggedWaiting;
 	// Containers whose items all have their icons ready (or found ineligible),
 	// so the prefetch pass can skip re-scanning them every frame - this matters a lot for the
 	// bank, which can hold 800+ slots.
@@ -516,6 +564,10 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private final int[] patchColor = new int[PATCH_SIZE];
 	private final boolean[] patchResolved = new boolean[PATCH_SIZE];
 	private final boolean[] patchResolvedScratch = new boolean[PATCH_SIZE];
+	private final int[] shadeColors = new int[PATCH_SIZE];
+	private final int[] alphaCounts = new int[256];
+	private final int[] shownRows = new int[ICON_HEIGHT];
+	private final int[] shownColumns = new int[ICON_WIDTH];
 
 	private int[] cachedPalette;
 	private double cachedPaletteBrightness;
@@ -537,6 +589,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			drawAfterInterface(groupId);
 		drawAfterLayer(InterfaceID.Bankmain.ITEMS);
 		drawAfterLayer(InterfaceID.SharedBank.ITEMS);
+		standardHooks = Set.copyOf(getDrawHooks());
 		// Ahead of other item overlays, so they draw on top of our replacement icon
 		setPriority(PRIORITY_LOW - 1);
 	}
@@ -577,6 +630,9 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			// with no way left to remove it.
 			if (!active)
 				return;
+			showOnInterface(client.getTopLevelInterfaceId());
+			for (WidgetNode node : client.getComponentTable())
+				showOnInterface(node.getId());
 			// Also when turned on after logging in, before any of them changes
 			for (int containerId : new int[]{InventoryID.INV, InventoryID.WORN, InventoryID.BANK}) {
 				ItemContainer container = client.getItemContainer(containerId);
@@ -617,10 +673,13 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		account = -1;
 		renderedIcons.clear();
 		referenceIcons.clear();
+		itemShadows.clear();
 		resolvedStackModels.clear();
 		stackModelSearchProgress.clear();
 		watchedContainers.clear();
 		settledContainers.clear();
+		newItemLayers.clear();
+		visibleAreas.clear();
 		paintedThisFrame.clear();
 		slots.clear();
 		cutItems.clear();
@@ -658,6 +717,17 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 
 	@Subscribe
 	public void onBeforeRender(BeforeRender event) {
+		if (!newItemLayers.isEmpty()) {
+			for (int layerId : newItemLayers) {
+				drawAfterLayer(layerId);
+				overlayCapture.showAfterLayer(layerId);
+				draggedItemBackdrop.showAfterLayer(layerId);
+			}
+			itemLayers.addAll(newItemLayers);
+			newItemLayers.clear();
+			updateHooks();
+		}
+
 		frameCount++;
 		slots.values().removeIf(slot -> slot.lastUsed < frameCount - 1);
 		rendersStartedThisFrame = 0;
@@ -666,6 +736,10 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		drawnUnderInterface.clear();
 		dragged = null;
 		draggedThisHook = null;
+		draggedLayerPassed = false;
+		draggedWaiting = null;
+		drawnOnByOthers.clear();
+		visibleAreas.clear();
 		patchBuffersUsed = 0;
 
 		// The same brightness reads as 0.8 before logging in and as a float after
@@ -802,10 +876,79 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		settledContainers.remove(event.getContainerId());
 	}
 
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event) {
+		if (showOnInterface(event.getGroupId()))
+			updateHooks();
+	}
+
+	// Re-added so the overlay manager picks up the new hooks
+	private void updateHooks() {
+		overlayManager.remove(this);
+		overlayManager.remove(overlayCapture);
+		overlayManager.remove(draggedItemBackdrop);
+		overlayManager.add(this);
+		overlayManager.add(overlayCapture);
+		overlayManager.add(draggedItemBackdrop);
+	}
+
+	private boolean showOnInterface(int groupId) {
+		if (groupId == -1 || getDrawHooks().contains(groupId << 16 | 0xFFFF) || isInsideStandardHook(groupId))
+			return false;
+		drawAfterInterface(groupId);
+		overlayCapture.showOnInterface(groupId);
+		return true;
+	}
+
+	// Interfaces inside one with a standard hook, like the deposit box's slot locks, would be handed its items after drawing over them
+	private boolean isInsideStandardHook(int groupId) {
+		for (WidgetNode node : client.getComponentTable())
+			if (node.getId() == groupId)
+				return standardHooks.contains(WidgetUtil.componentToInterface((int) node.getHash()) << 16 | 0xFFFF);
+		return false;
+	}
+
+	// Items are drawn right after their own layer, before the interface can draw over them, except where other overlays draw,
+	// like the outlines of tagged items in the CoX storage, which can only be taken over once they're drawn
+	private boolean isHooked(Widget widget) {
+		int layerId = widget.getParentId();
+		int interfaceHook = WidgetUtil.componentToInterface(widget.getId()) << 16 | 0xFFFF;
+		if (layerId == -1 || itemLayers.contains(layerId) || standardHooks.contains(layerId) || standardHooks.contains(interfaceHook) ||
+			isDrawnOnByOthers(interfaceHook))
+			return true;
+		newItemLayers.add(layerId);
+		return false;
+	}
+
+	private boolean isDrawnOnByOthers(int interfaceHook) {
+		return drawnOnByOthers.computeIfAbsent(interfaceHook, hook -> overlayManager.anyMatch(overlay ->
+			overlay != this && overlay != overlayCapture && overlay != draggedItemBackdrop && overlay.getDrawHooks().contains(hook)));
+	}
+
+	// Items of a layer drawn after another's are drawn over its items, like the rune pouch's runes to pick over its loadouts
+	private void findCoveredItems() {
+		coveredItems.clear();
+		laterLayers.clear();
+		List<WidgetItem> widgetItems = new ArrayList<>(overlayManager.getWidgetItems());
+		for (int i = widgetItems.size() - 1; i >= 0; i--) {
+			WidgetItem widgetItem = widgetItems.get(i);
+			if (widgetItem.getWidget() == client.getDraggedWidget())
+				continue;
+			Rectangle bounds = widgetItem.getCanvasBounds();
+			int layerId = widgetItem.getWidget().getParentId();
+			for (Map.Entry<Integer, List<Rectangle>> layer : laterLayers.entrySet())
+				if (layer.getKey() != layerId && layer.getValue().stream().anyMatch(bounds::intersects))
+					coveredItems.add(widgetItem);
+			laterLayers.computeIfAbsent(layerId, k -> new ArrayList<>()).add(bounds);
+		}
+	}
+
 	@Override
 	public Dimension render(Graphics2D graphics) {
 		if (!active || uiWipedByBlindfold())
 			return null;
+		placedThisHook.clear();
+		findCoveredItems();
 		boolean draggedHere = placeDraggedItem();
 		super.render(graphics);
 		if (draggedHere)
@@ -816,20 +959,34 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	@Override
 	public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem widgetItem) {
 		// Placed before the rest
-		if (widgetItem.getWidget() == client.getDraggedWidget())
-			return;
-
-		PlacedIcon placed = place(widgetItem);
-		if (placed == null)
+		if (widgetItem.getWidget() == client.getDraggedWidget() || !isHooked(widgetItem.getWidget()))
 			return;
 
 		BufferProvider frame = client.getBufferProvider();
 		int[] framePixels = frame.getPixels();
+		if (framePixels == null)
+			return;
+		Rectangle bounds = widgetItem.getCanvasBounds();
+		Rectangle around = new Rectangle(bounds.x - MARGIN, bounds.y - MARGIN, PATCH_WIDTH, PATCH_HEIGHT);
+		putBackMargins(framePixels, frame.getWidth(), around, true);
+		PlacedIcon placed = place(widgetItem);
+		if (placed == null) {
+			putBackMargins(framePixels, frame.getWidth(), around, false);
+			return;
+		}
+
 		float opacity = (256 - widgetItem.getWidget().getOpacity()) / 256f;
 		Slot slot = placed.slot;
 		if (!slot.holds(placed, opacity) || !samePixels(framePixels, frame.getWidth(), placed, slot.behind)) {
 			readPatch(framePixels, frame.getWidth(), placed, slot.behind);
-			int shadowColor = inpaintBackground(framePixels, frame.getWidth(), placed.bounds, placed.patchArea, placed.reference);
+			int shadowColor = inpaintBackground(framePixels, frame.getWidth(), placed.bounds, placed.patchArea, placed.reference,
+				256 - widgetItem.getWidget().getOpacity());
+			// The game shades the items of a layer alike, also where the dragged item hides part of this one's shadow
+			int layerId = widgetItem.getWidget().getParentId();
+			if (shadowColor != 0)
+				itemShadows.put(layerId, shadowColor);
+			else if (client.getDraggedWidget() != null)
+				shadowColor = itemShadows.getOrDefault(layerId, 0);
 			composeIcon(placed, shadowColor, opacity);
 			slot.keep(placed, opacity);
 		}
@@ -839,6 +996,25 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			cutItems.add(placed);
 		} else {
 			writePatch(framePixels, frame.getWidth(), placed, placed.composed);
+		}
+		placedThisHook.add(placed);
+	}
+
+	// Items drawn just before took the edge of this one with them, like where the rune pouch's stack sizes start,
+	// which is put back while it's looked at, and taken out again if it's not drawn after all
+	private void putBackMargins(int[] framePixels, int frameWidth, Rectangle area, boolean back) {
+		for (PlacedIcon placed : placedThisHook) {
+			Rectangle overlap = placed.patchArea.intersection(area);
+			int[] behind = placed.slot.behind;
+			int[] written = client.isGpu() ? placed.slot.cut : placed.composed;
+			for (int y = overlap.y; y < overlap.y + overlap.height; y++) {
+				for (int x = overlap.x; x < overlap.x + overlap.width; x++) {
+					int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+					int i = y * frameWidth + x;
+					if (!placed.reference.has(patch, FLAG_STACK_TEXT) && framePixels[i] == (back ? written[patch] : behind[patch]))
+						framePixels[i] = back ? behind[patch] : written[patch];
+				}
+			}
 		}
 	}
 
@@ -871,17 +1047,28 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			return null;
 		showAnimationFrame(icon);
 
-		Rectangle onScreen = bounds.intersection(widget.getParent().getBounds());
-		boolean isDragged = widget == client.getDraggedWidget();
-		// The game only reports items inside its clip, so the parent is still where it was before it was shown
-		if (onScreen.isEmpty() && !isDragged)
-			onScreen = bounds;
-		// Some interfaces report their items twice. The dragged item can be anywhere over the others.
-		if (onScreen.isEmpty() || !isDragged && !paintedThisFrame.add(bounds))
-			return null;
-
 		BufferProvider frame = client.getBufferProvider();
 		if (frame.getPixels() == null)
+			return null;
+
+		boolean isDragged = widget == client.getDraggedWidget();
+		// Some interfaces report their items twice. The dragged item can be anywhere over the others.
+		if (!isDragged && paintedThisFrame.contains(bounds) || coveredItems.contains(widgetItem))
+			return null;
+		Rectangle onScreen;
+		if (isDragged) {
+			onScreen = bounds.intersection(widget.getParent().getBounds()).intersection(new Rectangle(frame.getWidth(), frame.getHeight()));
+		} else if (widget.getOpacity() == 0 && !isAnimated(itemId) && client.getDraggedWidget() == null) {
+			// The parents can still be where they were a frame ago, like when an interface is shown or scrolled, so where
+			// the game drew the item tells how far it's clipped, unless it's see-through, animated, or the dragged item is over it
+			onScreen = shownArea(reference, bounds);
+		} else {
+			onScreen = bounds.intersection(visibleArea(widget));
+			// The game only reports items inside its clip, so the parent is still where it was before it was shown
+			if (onScreen.isEmpty())
+				onScreen = bounds;
+		}
+		if (onScreen.isEmpty() || !isDragged && !paintedThisFrame.add(bounds))
 			return null;
 
 		// Partly visible items stay clipped like the interface clips them
@@ -911,6 +1098,108 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		return new PlacedIcon(bounds, patchArea, reference, pixels, outlineRing, slot, slot.composed);
 	}
 
+	// Layers only show their children within their own bounds, and their parents'
+	private Rectangle visibleArea(Widget widget) {
+		Widget parent = widget.getParent();
+		Rectangle area = visibleAreas.get(parent);
+		if (area == null) {
+			area = parent.getBounds();
+			for (Widget ancestor = parent.getParent(); ancestor != null; ancestor = ancestor.getParent())
+				area = area.intersection(ancestor.getBounds());
+			visibleAreas.put(parent, area);
+		}
+		return area;
+	}
+
+	// Rows and columns of the item the game drew, up to the first ones it clipped
+	private Rectangle shownArea(ReferenceIcon reference, Rectangle bounds) {
+		BufferProvider frame = client.getBufferProvider();
+		int[] framePixels = frame.getPixels();
+		int frameWidth = frame.getWidth();
+		int frameHeight = frame.getHeight();
+		Arrays.fill(shownRows, 0);
+		Arrays.fill(shownColumns, 0);
+		int top = ICON_HEIGHT, bottom = -1, left = ICON_WIDTH, right = -1;
+		for (int y = 0; y < ICON_HEIGHT; y++) {
+			for (int x = 0; x < ICON_WIDTH; x++) {
+				int pixel = reference.plainPixels[y * ICON_WIDTH + x];
+				if (pixel == 0 || reference.has(patchIndex(x, y), FLAG_STACK_TEXT))
+					continue;
+				int fx = bounds.x + x;
+				int fy = bounds.y + y;
+				int shown = fx >= 0 && fy >= 0 && fx < frameWidth && fy < frameHeight && ((framePixels[fy * frameWidth + fx] ^ pixel) & 0xFFFFFF) == 0 ? SHOWN : CLIPPED;
+				shownRows[y] |= shown;
+				shownColumns[x] |= shown;
+				if (shown == SHOWN) {
+					top = Math.min(top, y);
+					bottom = Math.max(bottom, y);
+					left = Math.min(left, x);
+					right = Math.max(right, x);
+				}
+			}
+		}
+		if (bottom == -1)
+			return new Rectangle();
+
+		int fromY = 0, toY = ICON_HEIGHT, fromX = 0, toX = ICON_WIDTH;
+		for (int y = 0; y < top; y++)
+			if ((shownRows[y] & CLIPPED) != 0)
+				fromY = y + 1;
+		for (int y = ICON_HEIGHT - 1; y > bottom; y--)
+			if ((shownRows[y] & CLIPPED) != 0)
+				toY = y;
+		for (int x = 0; x < left; x++)
+			if ((shownColumns[x] & CLIPPED) != 0)
+				fromX = x + 1;
+		for (int x = ICON_WIDTH - 1; x > right; x--)
+			if ((shownColumns[x] & CLIPPED) != 0)
+				toX = x;
+
+		// The game clips to a rectangle, so an item it drew is all there within it. Items hidden behind others only seem
+		// partly drawn where they look alike, like the stone of runes.
+		for (int y = fromY; y < toY; y++) {
+			for (int x = fromX; x < toX; x++) {
+				int pixel = reference.plainPixels[y * ICON_WIDTH + x];
+				if (pixel == 0 || reference.has(patchIndex(x, y), FLAG_STACK_TEXT))
+					continue;
+				int fx = bounds.x + x;
+				int fy = bounds.y + y;
+				if (fx < 0 || fy < 0 || fx >= frameWidth || fy >= frameHeight || ((framePixels[fy * frameWidth + fx] ^ pixel) & 0xFFFFFF) != 0)
+					return new Rectangle();
+			}
+		}
+		return new Rectangle(bounds.x + fromX, bounds.y + fromY, toX - fromX, toY - fromY);
+	}
+
+	// Animated textures change the colors of an icon from one moment the game draws it to the next
+	private boolean isAnimated(int itemId) {
+		return animatedItems.computeIfAbsent(itemId, id -> {
+			ItemComposition item = client.getItemDefinition(id);
+			// Notes show the noted item on their paper
+			if (item.getNote() != -1)
+				item = client.getItemDefinition(item.getLinkedNoteId());
+			ModelData data = client.loadModelData(item.getInventoryModel());
+			short[] faceTextures = data == null ? null : data.getFaceTextures();
+			if (faceTextures == null)
+				return false;
+			short[] find = item.getTextureToReplace();
+			short[] replace = item.getTextureToReplaceWith();
+			Texture[] textures = client.getTextureProvider().getTextures();
+			for (short texture : faceTextures) {
+				for (int i = 0; find != null && i < find.length; i++) {
+					if (texture == find[i]) {
+						texture = replace[i];
+						break;
+					}
+				}
+				if (texture >= 0 && texture < textures.length && textures[texture] != null &&
+					textures[texture].getAnimationDirection() != 0 && textures[texture].getAnimationSpeed() != 0)
+					return true;
+			}
+			return false;
+		});
+	}
+
 	private int[] nextPatchBuffer() {
 		if (patchBuffersUsed == patchBuffers.size())
 			patchBuffers.add(new int[PATCH_SIZE]);
@@ -918,8 +1207,9 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	}
 
 	/**
-	 * The game draws the dragged item as soon as the rest of its interface is drawn, so after its layer but before the
-	 * interface's overlays. Where it's already there, it's taken back out before the items under it are done.
+	 * The game draws the dragged item once the rest of its interface is drawn, so after its layer but before the
+	 * interface's overlays, the bank's too. Where it's already there, it's taken back out before the items under it are
+	 * done. Handed over by its own layer, it isn't drawn yet, so it waits for its interface, or for the dragged item pass.
 	 */
 	private boolean placeDraggedItem() {
 		Widget draggedWidget = client.getDraggedWidget();
@@ -927,8 +1217,13 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		if (draggedWidget == null || dragged != null)
 			return false;
 		for (WidgetItem widgetItem : overlayManager.getWidgetItems()) {
-			if (widgetItem.getWidget() != draggedWidget)
+			if (widgetItem.getWidget() != draggedWidget || !isHooked(draggedWidget))
 				continue;
+			if (!draggedLayerPassed && getDrawHooks().contains(draggedWidget.getParentId())) {
+				draggedLayerPassed = true;
+				draggedWaiting = widgetItem;
+				return false;
+			}
 			PlacedIcon placed = place(widgetItem);
 			if (placed == null)
 				return false;
@@ -937,8 +1232,12 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			BufferProvider frame = client.getBufferProvider();
 			if (backdropFrame == frameCount && placed.bounds.equals(backdropBounds))
 				takeOutGameDraggedItem(frame.getPixels(), frame.getWidth(), placed, backdrop);
-			else if (isDrawnInPlace(draggedWidget))
-				takeOutGameDraggedItem(frame.getPixels(), frame.getWidth(), placed, underDraggedInPlace(placed));
+			else if (!takeOutDrawnDraggedItem(placed, widgetItem)) {
+				// Not drawn yet after all, so it's tried again once everything is
+				draggedWaiting = widgetItem;
+				return false;
+			}
+			draggedWaiting = null;
 			dragged = placed;
 			return true;
 		}
@@ -959,46 +1258,83 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		backdropFrame = frameCount;
 	}
 
-	// The bank draws its dragged item within its own layer, so it's already there when the layer's done
-	private static boolean isDrawnInPlace(Widget widget) {
-		int group = WidgetUtil.componentToInterface(widget.getId());
-		return group == WidgetUtil.componentToInterface(InterfaceID.Bankmain.ITEMS)
-			|| group == WidgetUtil.componentToInterface(InterfaceID.SharedBank.ITEMS);
+	// Once everything is drawn, when no later hook handed it over
+	private void placeDraggedItemLate() {
+		WidgetItem widgetItem = draggedWaiting;
+		draggedWaiting = null;
+		if (widgetItem == null || dragged != null || widgetItem.getWidget() != client.getDraggedWidget())
+			return;
+		PlacedIcon placed = place(widgetItem);
+		if (placed == null || !takeOutDrawnDraggedItem(placed, widgetItem))
+			return;
+		dragged = placed;
+		cutDraggedShape(placed);
 	}
 
 	/**
-	 * What the game drew its dragged item over, from how it's half see-through over it. Where its icon is the item
-	 * itself that's exact. Its shadow and count are filled in from around them.
+	 * Takes the game's dragged item out from how it's drawn half see-through, with its icon, count and its layer's
+	 * shadow, so what's under it comes out exactly, also what was drawn after its layer, like the bank's tab column.
+	 * Not where it doesn't fit, like when the game didn't draw it after all.
 	 */
-	private int[] underDraggedInPlace(PlacedIcon placed) {
+	private boolean takeOutDrawnDraggedItem(PlacedIcon placed, WidgetItem widgetItem) {
 		BufferProvider frame = client.getBufferProvider();
+		if (frame.getPixels() == null)
+			return false;
 		int[] framePixels = frame.getPixels();
 		int frameWidth = frame.getWidth();
+		boolean gpu = client.isGpu();
+		Widget widget = widgetItem.getWidget();
 		ReferenceIcon reference = placed.reference;
-		Arrays.fill(patchColor, 0);
-		Arrays.fill(patchResolved, false);
+		int shadowColor = itemShadows.getOrDefault(widget.getParentId(), 0) & 0xFFFFFF;
+		// Animated textures move on, so it's taken out as the game drew it, which it keeps until it draws it again
+		SpritePixels shown = !isAnimated(widgetItem.getId()) ? null : client.createItemSprite(widgetItem.getId(),
+			widgetItem.getQuantity(), widget.getBorderType(), shadowColor, widget.getItemQuantityMode(), false, Constants.CLIENT_DEFAULT_ZOOM);
+		int[] under = nextPatchBuffer();
+		placed.drawnByGame = nextPatchBuffer();
+		Arrays.fill(placed.drawnByGame, 0);
+		int drawn = 0, notDrawn = 0;
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
-				int drawn = framePixels[y * frameWidth + x];
-				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				if (reference.has(patch, FLAG_STACK_TEXT) || reference.has(patch, FLAG_SHADOW)) {
-					patchColor[patch] = drawn;
-				} else if (reference.has(patch, FLAG_ITEM)) {
-					int game = reference.plainPixels[(y - placed.bounds.y) * ICON_WIDTH + x - placed.bounds.x];
-					patchColor[patch] = unblendDragged(drawn, 0xFF000000 | game);
-					patchResolved[patch] = true;
-				} else {
-					patchColor[patch] = drawn;
-					patchResolved[patch] = true;
+				int localX = x - placed.bounds.x, localY = y - placed.bounds.y;
+				if (localX < 0 || localY < 0 || localX >= ICON_WIDTH || localY >= ICON_HEIGHT)
+					continue;
+				int patch = patchIndex(localX, localY);
+				int flat = localY * ICON_WIDTH + localX;
+				int color = shown != null ? shown.getPixels()[flat]
+					: reference.has(patch, FLAG_STACK_TEXT) ? reference.countPixels[flat]
+					: reference.has(patch, FLAG_ITEM) ? reference.plainPixels[flat]
+					: reference.has(patch, FLAG_SHADOW) ? shadowColor : 0;
+				if (color == 0)
+					continue;
+				drawn++;
+				// Drawn as (icon + under) / 2, and with GPU with alpha 128 + under / 2
+				int pixel = framePixels[y * frameWidth + x];
+				int alpha = pixel >>> 24;
+				int underAlpha = !gpu ? alpha : alpha > 128 ? 2 * (alpha - 128) + 1 : 0;
+				int top = gpu ? underAlpha : 255;
+				boolean fits = !gpu || alpha >= 128;
+				int result = underAlpha << 24;
+				for (int shift = 0; shift < 24; shift += 8) {
+					int channel = 2 * (pixel >> shift & 0xFF) - (color >> shift & 0xFF);
+					fits &= channel >= -1 && channel <= top + 1;
+					result |= Math.max(0, Math.min(top, channel)) << shift;
 				}
+				if (!fits)
+					notDrawn++;
+				under[patch] = fits ? result : pixel;
+				placed.drawnByGame[patch] = 0xFF000000 | color;
 			}
 		}
-		for (int pass = 0; pass < INPAINT_PASSES; pass++)
-			if (!spreadKnownColorsOnce())
-				break;
-		int[] under = nextPatchBuffer();
-		System.arraycopy(patchColor, 0, under, 0, PATCH_SIZE);
-		return under;
+		if (drawn == 0 || notDrawn * 8 > drawn)
+			return false;
+		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
+			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
+				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+				if (placed.drawnByGame[patch] != 0)
+					framePixels[y * frameWidth + x] = under[patch];
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -1034,19 +1370,49 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		PlacedIcon placed = dragged;
 		if (placed == null)
 			return;
+		cutDraggedShape(placed);
+		draggedThisHook = placed;
+	}
+
+	private void cutDraggedShape(PlacedIcon placed) {
 		if (client.isGpu()) {
-			// Drawn under everything, since the game draws the dragged item over the rest of the interface
+			// Only where it's drawn, with what's there under it, so the rest of the interface stays where it is.
+			// The items under it are cut out already, so they show through it.
 			BufferProvider frame = client.getBufferProvider();
 			int[] framePixels = frame.getPixels();
 			int frameWidth = frame.getWidth();
 			placed.background = nextPatchBuffer();
-			readPatch(framePixels, frameWidth, placed, placed.background);
+			Arrays.fill(placed.background, 0);
 			for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
-				int row = y * frameWidth + placed.patchArea.x;
-				Arrays.fill(framePixels, row, row + placed.patchArea.width, 0);
+				for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
+					int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+					if (!isDrawnAt(placed, patch, x - placed.bounds.x, y - placed.bounds.y))
+						continue;
+					int i = y * frameWidth + x;
+					placed.background[patch] = framePixels[i];
+					framePixels[i] = 0;
+				}
 			}
+		} else {
+			BufferProvider frame = client.getBufferProvider();
+			placed.background = nextPatchBuffer();
+			readPatch(frame.getPixels(), frame.getWidth(), placed, placed.background);
 		}
-		draggedThisHook = placed;
+	}
+
+	// Where the game draws the dragged item or we do, with its shadow and count, and around it, where tags outline it
+	private static boolean isDrawnAt(PlacedIcon placed, int patch, int localX, int localY) {
+		ReferenceIcon reference = placed.reference;
+		return reference.has(patch, FLAG_ITEM) || reference.has(patch, FLAG_SHADOW) || reference.has(patch, FLAG_STACK_TEXT)
+			|| reference.has(patch, FLAG_OUTLINE)
+			|| placed.pixels[patch] >>> 24 != 0 || placed.outlineRing[patch] || shade(placed, localX, localY) != 0;
+	}
+
+	// The game lights its icons from the upper left, with the shadow clipped at the edge of the icon
+	private static float shade(PlacedIcon placed, int localX, int localY) {
+		if (localX < 1 || localY < 1 || localX >= ICON_WIDTH || localY >= ICON_HEIGHT)
+			return 0;
+		return alpha(placed.pixels[patchIndex(localX - 1, localY - 1)]);
 	}
 
 	private void drawDraggedItem() {
@@ -1073,10 +1439,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 				break;
 			}
 		}
-		if (gpu)
-			Arrays.fill(patchColor, 0);
-		else
-			System.arraycopy(placed.background, 0, patchColor, 0, PATCH_SIZE);
+		System.arraycopy(placed.background, 0, patchColor, 0, PATCH_SIZE);
 		composeIcon(placed, shadowColor, DRAGGED_OPACITY);
 		int[] drawn = drawWithOverlays(placed);
 		// Its count, as the game drew it
@@ -1094,7 +1457,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	}
 
 	/**
-	 * The dragged item goes over the items, newest first, and what the dragged item is drawn over goes under them all.
+	 * The dragged item goes over the items, newest first.
 	 */
 	private void drawUnderInterface() {
 		BufferProvider frame = client.getBufferProvider();
@@ -1113,8 +1476,6 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			drawUnder(framePixels, frameWidth, item, item.drawn);
 		}
 		drawnUnderInterface.clear();
-		if (draggedDrawn)
-			drawUnder(framePixels, frameWidth, placed, placed.background);
 	}
 
 	private static void drawUnder(int[] framePixels, int frameWidth, PlacedIcon placed, int[] patchPixels) {
@@ -1659,60 +2020,88 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	 * shadow pixels don't all share one colour (a busy background), in which case we skip
 	 * drawing a shadow of our own.
 	 */
-	private int inpaintBackground(int[] framePixels, int frameWidth, Rectangle iconBounds, Rectangle patchArea, ReferenceIcon reference) {
+	private int inpaintBackground(int[] framePixels, int frameWidth, Rectangle iconBounds, Rectangle patchArea, ReferenceIcon reference,
+		int itemAlpha) {
 		Arrays.fill(patchColor, 0);
 		Arrays.fill(patchResolved, false);
+		boolean gpu = client.isGpu();
 		for (int y = patchArea.y; y < patchArea.y + patchArea.height; y++) {
 			for (int x = patchArea.x; x < patchArea.x + patchArea.width; x++) {
 				int patch = patchIndex(x - iconBounds.x, y - iconBounds.y);
-				patchColor[patch] = framePixels[y * frameWidth + x];
+				int pixel = framePixels[y * frameWidth + x];
+				patchColor[patch] = pixel;
 				patchResolved[patch] = !reference.has(patch, FLAG_ITEM) && !reference.has(patch, FLAG_STACK_TEXT);
+				// Through a see-through item, like the bank's slot locks, what's under it shows, which ours is drawn over just as see-through
+				if (!patchResolved[patch] && itemAlpha < 256 && !reference.has(patch, FLAG_STACK_TEXT)) {
+					int under = unblend(pixel, reference.plainPixels[(y - iconBounds.y) * ICON_WIDTH + x - iconBounds.x], itemAlpha, gpu);
+					if (under != -1) {
+						patchColor[patch] = under;
+						patchResolved[patch] = true;
+					}
+				}
 			}
 		}
 
-		// Detected first, since it samples the pixels the loop below marks for inpainting
-		int shadowColor = detectUniformShadowColor(reference);
+		// Detected first, since it samples the pixels the loop below marks for inpainting. A see-through item's shadow
+		// is just as see-through, with a colour of its own that isn't known, so it stays as the game drew it.
+		int shadowColor = itemAlpha < 256 ? 0 : detectUniformShadowColor(reference);
 		// The game's shadow goes whether or not its colour could be identified: a colour we can't
 		// match means we draw no shadow of our own, not that we keep theirs. Leaving it behind
 		// only stays hidden while our icon covers it, so a custom rotation exposes it as a fringe.
-		for (int patch = 0; patch < PATCH_SIZE; patch++)
+		for (int patch = 0; patch < PATCH_SIZE && itemAlpha == 256; patch++)
 			if (reference.has(patch, FLAG_SHADOW))
 				patchResolved[patch] = false;
+
+		// A see-through interface lets what's drawn under it show through, like tile markers, which aren't painted under the item
+		Arrays.fill(alphaCounts, 0);
+		for (int patch = 0; patch < PATCH_SIZE; patch++)
+			if (patchResolved[patch])
+				alphaCounts[patchColor[patch] >>> 24]++;
+		int seeThrough = 0xFF;
+		for (int alpha = 0; alpha < 0xFF; alpha++)
+			if (alphaCounts[alpha] > alphaCounts[seeThrough])
+				seeThrough = alpha;
+		for (int pass = 0; seeThrough != 0xFF && pass < INPAINT_PASSES; pass++)
+			if (!spreadKnownColorsOnce(seeThrough))
+				break;
 
 		// Each pass only reaches one pixel further in, and the pixels it hasn't reached still hold
 		// the game's icon, so this runs until the whole silhouette is covered rather than to a
 		// fixed budget. Stopping early left the middle of the icon in place, which only stayed
 		// hidden while ours covered the same shape - a custom rotation exposes it.
 		for (int pass = 0; pass < INPAINT_PASSES; pass++)
-			if (!spreadKnownColorsOnce())
+			if (!spreadKnownColorsOnce(-1))
 				break;
 
 		return shadowColor;
 	}
 
-	/** Every pixel the game drop-shadowed should be the same colour; if not, treat as unknown. */
+	/** Nearly every pixel the game drop-shadowed should be the same colour; if not, treat as unknown. */
 	private int detectUniformShadowColor(ReferenceIcon reference) {
-		int shadowColor = 0;
-		boolean seenAny = false;
-		for (int patch = 0; patch < PATCH_SIZE; patch++) {
-			if (!patchResolved[patch] || !reference.has(patch, FLAG_SHADOW))
-				continue;
-			if (!seenAny) {
-				shadowColor = patchColor[patch];
-				seenAny = true;
-			} else if (patchColor[patch] != shadowColor) {
-				return 0;
+		int shaded = 0;
+		for (int patch = 0; patch < PATCH_SIZE; patch++)
+			if (patchResolved[patch] && reference.has(patch, FLAG_SHADOW))
+				shadeColors[shaded++] = patchColor[patch];
+		int shadowColor = 0, mostShaded = 0;
+		for (int i = 0; i < shaded && mostShaded <= shaded / 2; i++) {
+			int count = 0;
+			for (int j = i; j < shaded; j++)
+				if (shadeColors[j] == shadeColors[i])
+					count++;
+			if (count > mostShaded) {
+				mostShaded = count;
+				shadowColor = shadeColors[i];
 			}
 		}
-		return shadowColor;
+		return mostShaded >= shaded * .8f ? shadowColor : 0;
 	}
 
 	/**
 	 * One diffusion pass: every unresolved pixel adopts the average of its resolved
-	 * neighbours. Returns whether anything was actually resolved this pass, so the caller can
-	 * stop early once the patch has settled instead of always running the full pass budget.
+	 * neighbours, only those of the given alpha unless it's -1. Returns whether anything was actually resolved this pass,
+	 * so the caller can stop early once the patch has settled instead of always running the full pass budget.
 	 */
-	private boolean spreadKnownColorsOnce() {
+	private boolean spreadKnownColorsOnce(int alpha) {
 		System.arraycopy(patchResolved, 0, patchResolvedScratch, 0, PATCH_SIZE);
 		boolean resolvedAny = false;
 		int patch = 0;
@@ -1731,6 +2120,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 					if (!patchResolved[neighborPatch])
 						continue;
 					int neighborColor = patchColor[neighborPatch];
+					if (alpha != -1 && neighborColor >>> 24 != alpha)
+						continue;
 					a += neighborColor >>> 24;
 					r += neighborColor >> 16 & 0xFF;
 					g += neighborColor >> 8 & 0xFF;
@@ -1755,13 +2146,14 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 				int localY = y - placed.bounds.y;
 				int patch = patchIndex(localX, localY);
 				int background = patchColor[patch];
-				if (shadowColor != 0 && localX - 1 >= -MARGIN && localY - 1 >= -MARGIN) {
-					float shade = alpha(placed.pixels[patchIndex(localX - 1, localY - 1)]);
+				int iconArgb = placed.pixels[patch];
+				// The shadow falls on what's behind the item, not on the item, which shows through a half see-through one
+				if (shadowColor != 0) {
+					float shade = shade(placed, localX, localY) * (1 - alpha(iconArgb));
 					background = blend(shadowColor, shade, background, 1 - alpha(shadowColor) * shade);
 				}
 
 				// With GPU the interface is premultiplied ARGB, so alpha is blended like the colours
-				int iconArgb = placed.pixels[patch];
 				placed.composed[patch] = blend(iconArgb, opacity, background, 1 - alpha(iconArgb) * opacity);
 			}
 		}
@@ -1805,11 +2197,11 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	/**
 	 * Takes what other overlays drew over the cut out item. Fills and outlines that follow the game's icon, like
 	 * Inventory Tags', are redrawn to fit ours, with fills covering the shadow too. Everything else stays where it was
-	 * drawn, unless it's all taken.
+	 * drawn, over ours.
 	 */
-	private void captureOverlays(int[] framePixels, int frameWidth, PlacedIcon placed) {
+	private void captureOverlays(int[] framePixels, int frameWidth, PlacedIcon placed, List<PlacedIcon> looked) {
 		// Nothing was drawn over the item while its pixels are still as they were cut out
-		if (!placed.takeAll && placed.slot != null && samePixels(framePixels, frameWidth, placed, placed.slot.cut)) {
+		if (placed.slot != null && samePixels(framePixels, frameWidth, placed, placed.slot.cut)) {
 			placed.overlays = null;
 			return;
 		}
@@ -1818,24 +2210,75 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
 				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				placed.overlays[patch] = !placed.takeAll && reference.has(patch, FLAG_STACK_TEXT) ? 0 : framePixels[y * frameWidth + x];
+				placed.overlays[patch] = reference.has(patch, FLAG_STACK_TEXT) ? 0 : framePixels[y * frameWidth + x];
 			}
 		}
+		findOthers(placed, looked);
 		placed.fill = shapeColor(placed, FLAG_ITEM);
 		placed.outline = shapeColor(placed, FLAG_OUTLINE);
+	}
+
+	// Once every item has looked
+	private static void takeOverlays(int[] framePixels, int frameWidth, PlacedIcon placed) {
+		if (placed.overlays == null)
+			return;
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
-				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				if (placed.takeAll || isRedrawn(placed, patch))
+				if (isRedrawn(placed, patchIndex(x - placed.bounds.x, y - placed.bounds.y)))
 					framePixels[y * frameWidth + x] = 0;
 			}
 		}
 	}
 
+	/**
+	 * What's drawn over this item that belongs to others reaching into it, like a neighbour when an item is dragged next
+	 * to it: their outlines, which are drawn over all items, the parts of the ones drawn after it, which are drawn over
+	 * it (the dragged one over all), and the rest of the ones drawn before it, around its own shape.
+	 */
+	private static void findOthers(PlacedIcon placed, List<PlacedIcon> looked) {
+		placed.others = null;
+		placed.covered = null;
+		ReferenceIcon reference = placed.reference;
+		int index = looked.indexOf(placed);
+		for (int o = 0; o < looked.size(); o++) {
+			PlacedIcon other = looked.get(o);
+			if (other == placed || !other.patchArea.intersects(placed.patchArea))
+				continue;
+			// Later ones are drawn over it, and the dragged one is last
+			boolean over = o > index;
+			Rectangle overlap = other.patchArea.intersection(placed.patchArea);
+			for (int y = overlap.y; y < overlap.y + overlap.height; y++) {
+				for (int x = overlap.x; x < overlap.x + overlap.width; x++) {
+					int theirs = patchIndex(x - other.bounds.x, y - other.bounds.y);
+					int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
+					boolean otherOutline = other.reference.has(theirs, FLAG_OUTLINE);
+					boolean otherItem = other.reference.has(theirs, FLAG_ITEM);
+					// Items are drawn with what's around them, the dragged one only where it's drawn
+					if (over && (other.slot != null || isDrawnAt(other, theirs, x - other.bounds.x, y - other.bounds.y))) {
+						if (placed.covered == null)
+							placed.covered = new boolean[PATCH_SIZE];
+						placed.covered[patch] = true;
+					}
+					if (reference.has(patch, FLAG_OUTLINE) || !otherOutline && !otherItem)
+						continue;
+					if (otherOutline || over || !reference.has(patch, FLAG_ITEM) && !reference.has(patch, FLAG_SHADOW)) {
+						if (placed.others == null)
+							placed.others = new boolean[PATCH_SIZE];
+						placed.others[patch] = true;
+					}
+				}
+			}
+		}
+	}
+
+	private static boolean isOthers(PlacedIcon placed, int patch) {
+		return placed.others != null && placed.others[patch];
+	}
+
 	private static boolean isRedrawn(PlacedIcon placed, int patch) {
 		ReferenceIcon reference = placed.reference;
 		int overlay = placed.overlays[patch];
-		return !reference.has(patch, FLAG_STACK_TEXT) && (
+		return !reference.has(patch, FLAG_STACK_TEXT) && !isOthers(placed, patch) && !(placed.covered != null && placed.covered[patch]) && (
 			placed.fill != 0 && (reference.has(patch, FLAG_ITEM) && overlay == placed.fill || reference.has(patch, FLAG_SHADOW)) ||
 			placed.outline != 0 && reference.has(patch, FLAG_OUTLINE) && overlay == placed.outline);
 	}
@@ -1844,7 +2287,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		Slot slot = placed.slot;
 		if (placed.overlays == null)
 			return placed.composed;
-		if (slot != null && slot.overlaid && slot.takeAll == placed.takeAll && samePatch(placed, placed.overlays, slot.overlays))
+		if (slot != null && slot.overlaid && slot.fill == placed.fill && slot.outline == placed.outline
+			&& samePatch(placed, placed.overlays, slot.overlays))
 			return slot.drawn;
 
 		int fill = placed.fill;
@@ -1855,23 +2299,25 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 				int localX = x - placed.bounds.x;
 				int localY = y - placed.bounds.y;
 				int patch = patchIndex(localX, localY);
-				// What isn't taken stays in the interface, over ours
-				int overlay = placed.takeAll && !isRedrawn(placed, patch) ? placed.overlays[patch] : 0;
 				float item = alpha(placed.pixels[patch]);
 				float shadow = localX - 1 >= -MARGIN && localY - 1 >= -MARGIN ? alpha(placed.pixels[patchIndex(localX - 1, localY - 1)]) : 0;
 				float outlined = placed.outlineRing[patch] ? 1 - item : 0;
 				int fitted = over(scale(fill, Math.max(item, shadow)), scale(outline, outlined));
-				drawn[patch] = over(over(overlay, fitted), placed.composed[patch]);
+				// What isn't redrawn stays in the interface, over ours
+				drawn[patch] = over(fitted, placed.composed[patch]);
 			}
 		}
 		if (slot != null) {
 			System.arraycopy(placed.overlays, 0, slot.overlays, 0, PATCH_SIZE);
 			slot.overlaid = true;
-			slot.takeAll = placed.takeAll;
+			slot.fill = fill;
+			slot.outline = outline;
 		}
 		return drawn;
 	}
 
+	// Parts of the shape can be hidden by what's drawn over it after, like the charges Item Charges writes over the outline,
+	// and other items can reach into it, with their own tags
 	private static int shapeColor(PlacedIcon placed, byte shape) {
 		ReferenceIcon reference = placed.reference;
 		// Boyer-Moore majority vote
@@ -1879,7 +2325,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
 				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				if (reference.has(patch, FLAG_STACK_TEXT) || !reference.has(patch, shape) || reference.has(patch, FLAG_SHADOW))
+				if (reference.has(patch, FLAG_STACK_TEXT) || !reference.has(patch, shape) || reference.has(patch, FLAG_SHADOW)
+					|| isOthers(placed, patch))
 					continue;
 				pixels++;
 				if (lead == 0)
@@ -1890,18 +2337,43 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		if (color == 0)
 			return 0;
 
-		int covered = 0;
+		int covered = 0, hidden = 0;
 		for (int y = placed.patchArea.y; y < placed.patchArea.y + placed.patchArea.height; y++) {
 			for (int x = placed.patchArea.x; x < placed.patchArea.x + placed.patchArea.width; x++) {
 				int patch = patchIndex(x - placed.bounds.x, y - placed.bounds.y);
-				if (reference.has(patch, FLAG_STACK_TEXT) || placed.overlays[patch] != color || reference.has(patch, FLAG_SHADOW))
+				if (reference.has(patch, FLAG_STACK_TEXT) || reference.has(patch, FLAG_SHADOW) || isOthers(placed, patch))
 					continue;
+				if (placed.overlays[patch] != color) {
+					if (reference.has(patch, shape) && placed.overlays[patch] != 0)
+						hidden++;
+					continue;
+				}
 				if (!reference.has(patch, shape))
 					return 0;
 				covered++;
 			}
 		}
-		return covered >= MIN_SHAPE_COVERAGE * pixels ? color : 0;
+		return covered * 2 >= pixels && covered >= MIN_SHAPE_COVERAGE * (pixels - hidden) ? color : 0;
+	}
+
+	/**
+	 * What's under an item the game drew at an alpha out of 256, as colour = (item * alpha + under * (256 - alpha)) >> 8 and
+	 * with GPU alpha = alpha + (under alpha * (256 - alpha) >> 8), or -1 where the pixel doesn't fit that.
+	 */
+	private static int unblend(int pixel, int item, int alpha, boolean gpu) {
+		int rest = 256 - alpha;
+		int underAlpha = !gpu ? 255 : Math.round(((pixel >>> 24) - alpha) * 256f / rest);
+		if (underAlpha < -2 || underAlpha > 257)
+			return -1;
+		underAlpha = Math.max(0, Math.min(255, underAlpha));
+		int result = (gpu ? underAlpha : pixel >>> 24) << 24;
+		for (int shift = 0; shift < 24; shift += 8) {
+			int channel = Math.round(((pixel >> shift & 0xFF) * 256f - (item >> shift & 0xFF) * alpha) / rest);
+			if (channel < -3 || channel > underAlpha + 3)
+				return -1;
+			result |= Math.max(0, Math.min(underAlpha, channel)) << shift;
+		}
+		return result;
 	}
 
 	private static float alpha(int argb) {

@@ -468,6 +468,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private final CustomRotationStorage rotationStorage;
 	private final ItemRenderSheet itemRenderSheet;
 	private final IconEditorSidePanel sidePanel;
+	private final ModelPackStorage modelPacks;
 	private final OverlayCapture overlayCapture = new OverlayCapture();
 	private final DraggedItemPainter draggedItemPainter = new DraggedItemPainter();
 	private final DraggedItemBackdrop draggedItemBackdrop = new DraggedItemBackdrop();
@@ -481,6 +482,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	private boolean lastKnownCustomRotationsEnabled = true;
 	private boolean lastKnownStretched;
 	private boolean lastKnownAnimateTextures = true;
+	private String lastKnownModelPack = "";
 	private boolean blindfoldHidesUi;
 	private int animationCycle;
 	@Nullable
@@ -575,7 +577,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	@Inject
 	public HdItemIcons(Client client, EventBus eventBus, OverlayManager overlayManager, ClientThread clientThread,
 						ConfigManager configManager, HdItemIconsConfig config, CustomRotationStorage rotationStorage,
-						ItemRenderSheet itemRenderSheet, IconEditorSidePanel sidePanel) {
+						ItemRenderSheet itemRenderSheet, IconEditorSidePanel sidePanel, ModelPackStorage modelPacks) {
 		this.client = client;
 		this.eventBus = eventBus;
 		this.overlayManager = overlayManager;
@@ -585,6 +587,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		this.rotationStorage = rotationStorage;
 		this.itemRenderSheet = itemRenderSheet;
 		this.sidePanel = sidePanel;
+		this.modelPacks = modelPacks;
 		for (int groupId : INVENTORY_LIKE_INTERFACES)
 			drawAfterInterface(groupId);
 		drawAfterLayer(InterfaceID.Bankmain.ITEMS);
@@ -619,6 +622,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		}
 
 		active = true;
+		modelPacks.start(dataDirectory, this::modelPackChanged);
 		blindfoldHidesUi = readBlindfoldHidesUi();
 		sidePanel.setHost(this);
 		eventBus.register(this);
@@ -651,6 +655,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		if (!active)
 			return;
 		active = false;
+		modelPacks.stop();
 		sidePanel.setHost(null);
 		eventBus.unregister(this);
 		overlayManager.remove(this);
@@ -696,6 +701,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		lastKnownCustomRotationsEnabled = true;
 		lastKnownStretched = false;
 		lastKnownAnimateTextures = true;
+		lastKnownModelPack = "";
 		blindfoldHidesUi = false;
 		animationCycle = 0;
 		itemIndex = null;
@@ -750,9 +756,11 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		// between the two - a sharpened icon drawn at 1:1 looks over-sharpened
 		boolean stretched = client.isStretchedEnabled();
 		boolean animateTextures = config.animateTextures();
+		String modelPack = modelPacks.fingerprint();
 		if (brightness != lastKnownBrightness || quality != lastKnownQuality
 			|| customRotationsEnabled != lastKnownCustomRotationsEnabled
-			|| stretched != lastKnownStretched || animateTextures != lastKnownAnimateTextures) {
+			|| stretched != lastKnownStretched || animateTextures != lastKnownAnimateTextures
+			|| !modelPack.equals(lastKnownModelPack)) {
 			// Both the game's icons and ours depend on the brightness setting, and our own
 			// renders depend on the configured supersampling quality
 			lastKnownBrightness = brightness;
@@ -760,12 +768,13 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			lastKnownCustomRotationsEnabled = customRotationsEnabled;
 			lastKnownStretched = stretched;
 			lastKnownAnimateTextures = animateTextures;
+			lastKnownModelPack = modelPack;
 			remember();
 			referenceIcons.clear();
 			renderedIcons.clear();
 			settledContainers.clear();
 			iconCache = iconCacheDirectory == null ? null
-				: new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, animateTextures, PATCH_SIZE);
+				: new ItemIconCache(iconCacheDirectory, quality, brightness, customRotationsEnabled, stretched, animateTextures, modelPack, PATCH_SIZE);
 			if (iconCache != null)
 				renderExecutor.execute(iconCache::markUsed);
 			account = client.getAccountHash();
@@ -1522,7 +1531,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 			if (!consumeRenderBudget(visibleNow))
 				return PENDING;
 
-			int modelItemId = resolveModelItemId(itemId, quantity, borderWidth, reference);
+			ModelPack.Entry replacement = modelPacks.get(itemId);
+			int modelItemId = replacement != null ? itemId : resolveModelItemId(itemId, quantity, borderWidth, reference);
 			if (modelItemId == -1)
 				return PENDING;
 			icon.uncached = false;
@@ -1532,7 +1542,7 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 				if (cache != null)
 					renderExecutor.execute(() -> cache.save(reference.fingerprint, 0, null));
 			} else {
-				beginRenderingIcon(icon, modelItemId, borderWidth, reference.fingerprint);
+				beginRenderingIcon(icon, modelItemId, borderWidth, reference.fingerprint, replacement);
 			}
 		}
 		return icon.failed ? null : icon;
@@ -1628,6 +1638,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 	}
 
 	private int placedAs(int itemId) {
+		if (modelPacks.get(itemId) != null)
+			return itemId;
 		ItemComposition definition = client.getItemDefinition(itemId);
 		return definition.getPlaceholderTemplateId() != -1 && definition.getPlaceholderId() != -1
 			? definition.getPlaceholderId() : itemId;
@@ -1690,10 +1702,15 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		return sprite == null ? null : sprite.getPixels();
 	}
 
-	private void beginRenderingIcon(RenderedIcon icon, int itemId, int borderWidth, long fingerprint) {
+	private void beginRenderingIcon(RenderedIcon icon, int itemId, int borderWidth, long fingerprint,
+			@Nullable ModelPack.Entry replacement) {
 		ItemComposition item = client.getItemDefinition(itemId);
 		// Notes are drawn as the note's paper with a small copy of the real item on top
-		ModelLayer[] layers = item.getNote() == -1
+		CustomRotation camera = replacement == null ? null : modelPackCamera(itemId, replacement);
+		ModelLayer[] layers = replacement != null
+			? new ModelLayer[]{new ModelLayer(replacement.model, camera.xan2d, camera.yan2d, camera.zan2d,
+				new int[0], borderWidth, camera)}
+			: item.getNote() == -1
 			? new ModelLayer[]{buildModelLayer(itemId, 1, false, borderWidth)}
 			: new ModelLayer[]{buildModelLayer(item.getNote(), 1, false, borderWidth), buildModelLayer(item.getLinkedNoteId(), 10, true, 1)};
 		for (ModelLayer layer : layers) {
@@ -1767,6 +1784,19 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		return period;
 	}
 
+	private CustomRotation modelPackCamera(int itemId, ModelPack.Entry entry) {
+		CustomRotation saved = config.customRotationsEnabled() ? rotationStorage.get(itemId) : null;
+		return saved != null ? saved : entry.camera;
+	}
+
+	private void modelPackChanged() {
+		sidePanel.modelPackChanged();
+		RotationEditorDialog dialog = openRotationDialog;
+		openRotationDialog = null;
+		if (dialog != null)
+			SwingUtilities.invokeLater(dialog::dispose);
+	}
+
 	@Nullable
 	private ModelLayer buildModelLayer(int itemId, int quantity, boolean noted, int borderWidth) {
 		ItemComposition item = client.getItemDefinition(itemId);
@@ -1816,7 +1846,8 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 
 		int itemId = placedAs(pickedItemId);
 		ItemComposition item = client.getItemDefinition(itemId);
-		ItemIconRasterizer.IconModel iconModel = captureModel(item);
+		ModelPack.Entry replacement = modelPacks.get(itemId);
+		ItemIconRasterizer.IconModel iconModel = replacement == null ? captureModel(item) : replacement.model;
 		if (iconModel == null)
 			return;
 
@@ -1824,12 +1855,12 @@ public class HdItemIcons extends WidgetItemOverlay implements IconEditorHost {
 		int supersample = config.iconQuality().getSupersample();
 
 		ItemRenderSheet.Placement sheetDefault = itemRenderSheet.get(itemId);
-		CustomRotation defaults = new CustomRotation(item.getXan2d(), item.getYan2d(), item.getZan2d(),
+		CustomRotation defaults = replacement != null ? replacement.camera : new CustomRotation(item.getXan2d(), item.getYan2d(), item.getZan2d(),
 			sheetDefault.zoom2d, sheetDefault.offsetX, sheetDefault.offsetY,
 			sheetDefault.resizeX, sheetDefault.resizeY, sheetDefault.resizeZ);
 		CustomRotation existing = rotationStorage.get(itemId);
 		CustomRotation initial = existing != null ? existing : defaults;
-		int[] referencePixels = fetchGamePixels(itemId, 1, 0, ItemQuantityMode.NEVER, false);
+		int[] referencePixels = replacement != null ? null : fetchGamePixels(itemId, 1, 0, ItemQuantityMode.NEVER, false);
 		RotationEditorPanel.Session session = new RotationEditorPanel.Session(itemId, nameOf(itemId), initial,
 			defaults, savedIconPresets(itemId), iconModel, referencePixels, palette, supersample);
 

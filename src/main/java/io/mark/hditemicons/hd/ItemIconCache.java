@@ -36,9 +36,10 @@ class ItemIconCache {
 	private final int size;
 
 	ItemIconCache(Filepath root, IconQuality quality, double brightness, boolean customRotations, boolean stretched,
-				boolean animatedTextures, int size) {
+				boolean animatedTextures, String modelPack, int size) {
 		folder = root.joinSegment(String.format(Locale.ROOT, "v%d-%s-%.3f%s%s%s", VERSION, quality.name().toLowerCase(Locale.ROOT), brightness,
-			customRotations ? "" : "-default-rotations", stretched ? "-stretched" : "", animatedTextures ? "" : "-static-textures"));
+			customRotations ? "" : "-default-rotations", stretched ? "-stretched" : "", animatedTextures ? "" : "-static-textures")
+			+ (modelPack.isEmpty() ? "" : "-pack-" + modelPack));
 		this.size = size;
 	}
 

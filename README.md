@@ -30,6 +30,14 @@ item definition's own `zoom2d` / `xOffset2d` / `yOffset2d` / `xan2d` / `yan2d` /
 
 <img src="docs/icon_rotation.png" alt="Editing an item's icon rotation" width="534">
 
+## Custom model packs (prototype)
+
+The sidebar's **Models** tab imports/exports ZIP packs containing user-created OBJ meshes,
+optional PNG textures and item-ID/camera mappings. This exchanges actual model assets, while
+the existing Icon/Groups import/export continues to exchange settings. See
+[model-packs.md](docs/model-packs.md) for Blender export, the format, an original example model
+and the manual verification checklist. In-client visual verification is pending.
+
 ## Config
 
 - **Icon cache storage** — `Memory` (default) or `Disk`. Disk keeps rendered icons between

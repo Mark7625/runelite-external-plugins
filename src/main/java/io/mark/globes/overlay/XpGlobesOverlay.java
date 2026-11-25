@@ -219,10 +219,27 @@ public class XpGlobesOverlay extends Overlay {
 		int n = xpGlobes.size();
 		int xpDropOffset = config.xpDropOffset();
 
+		// Width the orbs actually occupy, and the width the overlay reserves for them.
+		// Middle/Right anchoring reserves room for the maximum number of orbs so the
+		// anchor point stays put as orbs are added and removed; Left grows rightwards
+		// from a fixed left edge, so it only ever needs the current width.
+		int contentWidth = orbsWidth(n, globeWidth, orbSpacing);
+		int layoutWidth = contentWidth;
+		int anchorOffset = 0;
+
+		RemasteredXpGlobesConfig.OrbAnchor anchor = config.orbAnchor();
+		if (anchor != RemasteredXpGlobesConfig.OrbAnchor.LEFT) {
+			int maxGlobes = Math.max(1, config.maximumGlobes());
+			layoutWidth = Math.max(contentWidth, orbsWidth(maxGlobes, globeWidth, orbSpacing));
+			anchorOffset = anchor == RemasteredXpGlobesConfig.OrbAnchor.RIGHT
+					? layoutWidth - contentWidth
+					: (layoutWidth - contentWidth) / 2;
+		}
+
 		double[] orbPositions = new double[n];
 		for (int i = 0; i < n; i++) {
 			XpGlobe xpGlobe = xpGlobes.get(i);
-			double targetX = PROGRESS_ARC_OFFSET + i * (globeWidth + orbSpacing);
+			double targetX = PROGRESS_ARC_OFFSET + anchorOffset + i * (globeWidth + orbSpacing);
 			double currentX;
 			if (!animateReposition) {
 				currentX = targetX;
@@ -241,8 +258,7 @@ public class XpGlobesOverlay extends Overlay {
 		}
 
 		if (config.enableXpDrops()) {
-			int overlayWidth = (n * (globeWidth + PROGRESS_ARC_OFFSET)) + (orbSpacing * (n - 1));
-			int xpDropCenterX = overlayWidth / 2;
+			int xpDropCenterX = anchorOffset + contentWidth / 2;
 			int xpDropCenterY = baseY + globeHeight + xpDropOffset;
 			processPendingXpDrops();
 			long now = System.currentTimeMillis();
@@ -291,12 +307,18 @@ public class XpGlobesOverlay extends Overlay {
 			index++;
 		}
 
-		int markersLength = (xpGlobes.size() * (globeWidth + PROGRESS_ARC_OFFSET)) + (orbSpacing * (xpGlobes.size() - 1));
 		int height = globeWidth + PROGRESS_ARC_OFFSET * 2;
 		if (config.enableXpDrops()) {
 			height += xpDropOffset + 80;
 		}
-		return new Dimension(markersLength, height);
+		return new Dimension(layoutWidth, height);
+	}
+
+	private static int orbsWidth(int count, int globeWidth, int orbSpacing) {
+		if (count <= 0) {
+			return 0;
+		}
+		return (count * (globeWidth + PROGRESS_ARC_OFFSET)) + (orbSpacing * (count - 1));
 	}
 
 	private void processPendingXpDrops() {

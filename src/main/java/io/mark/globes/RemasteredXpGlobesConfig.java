@@ -287,6 +287,38 @@ public interface RemasteredXpGlobesConfig extends Config {
 		return true;
 	}
 
+	/**
+	 * Controls which point multiple orbs cascade from.
+	 */
+	enum OrbAnchor {
+		LEFT("Left"),
+		CENTER("Middle"),
+		RIGHT("Right");
+
+		private final String name;
+
+		OrbAnchor(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public String toString() {
+			return name;
+		}
+	}
+
+	@ConfigItem(
+			keyName = "orbAnchor",
+			name = "Orb anchor",
+			description = "Point that orbs cascade from when more than one is shown. Left: cascade right. Middle: grow out from the centre. Right: cascade left.",
+			section = progressOrbsSection,
+			position = 28
+	)
+	default OrbAnchor orbAnchor()
+	{
+		return OrbAnchor.LEFT;
+	}
+
 	@ConfigItem(
 			keyName = "animateOrbReposition",
 			name = "Animate orb reposition",

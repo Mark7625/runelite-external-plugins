@@ -57,6 +57,7 @@ public class XpGlobesOverlay extends Overlay {
 	private static final double ARC_START_ANGLE = 270.0;
 	private static final double ARC_FULL_CIRCLE = 360.0;
 	private static final int ICON_AREA_SIZE_BASE = 113;
+	private static final int TOOLTIP_RECT_SIZE_X = 150;
 
 	private final Client client;
 	private final ImageCache globeImageCache;
@@ -96,6 +97,8 @@ public class XpGlobesOverlay extends Overlay {
 		this.tooltipManager = tooltipManager;
 		this.spriteManager = spriteManager;
 		setPosition(OverlayPosition.TOP_CENTER);
+
+		this.xpTooltip.getComponent().setPreferredSize(new Dimension(TOOLTIP_RECT_SIZE_X, 0));
 
 		this.globeImageCache = new ImageCache(RemasteredXpGlobes.class,
 				() -> (config.globeStyle() == GlobeStyle.MODERN ? "globes_modern/" : "") + "globe.png",
@@ -415,7 +418,6 @@ public class XpGlobesOverlay extends Overlay {
 	}
 
 	private double getXpProgress(XpGlobe xpGlobe) {
-		int currentLevel = xpGlobe.getCurrentLevel();
 		long currentXp = xpGlobe.getCurrentXp();
 
 		int goalXpInt = xpTrackerService.getEndGoalXp(xpGlobe.getSkill());
@@ -433,9 +435,6 @@ public class XpGlobesOverlay extends Overlay {
 			return Math.min(1.0, Math.max(0.0, progress));
 		}
 
-		if (currentLevel >= Experience.MAX_REAL_LEVEL) {
-			return 0.0;
-		}
 		return getLevelProgress(xpGlobe);
 	}
 
@@ -443,7 +442,11 @@ public class XpGlobesOverlay extends Overlay {
 		int currentLevel = xpGlobe.getCurrentLevel();
 		long currentXp = xpGlobe.getCurrentXp();
 
-		if (currentLevel >= Experience.MAX_REAL_LEVEL) {
+		int maxLevel = config.showVirtualLevel()
+				? Experience.MAX_VIRT_LEVEL
+				: Experience.MAX_REAL_LEVEL;
+
+		if (currentLevel >= maxLevel) {
 			return 0.0;
 		}
 

@@ -1,6 +1,10 @@
 # Classic Fishing Spots
 
-Restores the classic look of fishing spots.
+Brings back the classic sparkling fishing spot graphics, swapping the modern fishing
+spots for the old shoal that sparkles on the water.
+
+Not compatible with 117 HD, which draws its own fishing spots. While 117 HD is enabled
+this plugin stands down, and the classic spots come back as soon as it is turned off.
 
 ## Building
 

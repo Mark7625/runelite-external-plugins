@@ -24,33 +24,32 @@
  */
 package io.mark.fishingspots;
 
-import com.google.inject.Provides;
+import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 @PluginDescriptor(
 		name = "Classic Fishing Spots",
-		description = "Restores the classic look of fishing spots",
-		tags = {"fishing", "spots", "classic", "fish", "shoal"}
+		description = "Brings back the classic sparkling fishing spot graphics",
+		tags = {"fishing", "spots", "fish", "shoal", "sparkle", "classic", "2007"}
 )
 
 @Slf4j
 public class ClassicFishingSpotsPlugin extends Plugin {
 
-	@Provides
-	ClassicFishingSpotsConfig provideConfig(ConfigManager configManager) {
-		return configManager.getConfig(ClassicFishingSpotsConfig.class);
-	}
+	@Inject
+	private ClassicFishingSpotReplacer fishingSpotReplacer;
 
 	@Override
 	protected void startUp() {
-		log.debug("Classic Fishing Spots started");
+		fishingSpotReplacer.startUp();
+		log.debug("Classic Fishing Spots started, replacing {} fishing spot ids", FishingSpots.count());
 	}
 
 	@Override
 	protected void shutDown() {
+		fishingSpotReplacer.shutDown();
 		log.debug("Classic Fishing Spots stopped");
 	}
 }

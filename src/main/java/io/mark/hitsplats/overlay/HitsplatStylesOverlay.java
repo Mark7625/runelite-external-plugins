@@ -442,47 +442,9 @@ public class HitsplatStylesOverlay extends Overlay
 		}
 
 		int height = (base + actor.getAnimationHeightOffset()) / 2;
-		int ground = groundHeight(localPoint, worldView, actor.getFootprintSize());
+		int ground = Perspective.getFootprintTileHeight(client, localPoint, worldView.getPlane(), actor.getFootprintSize());
 		return Perspective.localToCanvas(client, localPoint.getWorldView(),
 			localPoint.getX(), localPoint.getY(), ground - height);
-	}
-
-	private int groundHeight(LocalPoint point, WorldView worldView, int footprint)
-	{
-		int plane = worldView.getPlane();
-		if (footprint == 0)
-		{
-			return worldView.getTileHeight(point.getX(), point.getY(), plane);
-		}
-
-		int half = footprint / 2;
-		int x = point.getX();
-		int y = point.getY();
-
-		int lowTileX = ((x - half) >> 7) + 1;
-		int lowTileY = ((y - half) >> 7) + 1;
-		int highTileX = (x + half) >> 7;
-		int highTileY = (y + half) >> 7;
-
-		int ground = Integer.MAX_VALUE;
-		for (int tileX = lowTileX; tileX <= highTileX; tileX++)
-		{
-			for (int tileY = lowTileY; tileY <= highTileY; tileY++)
-			{
-				ground = Math.min(ground, heightAt(worldView, tileX << 7, tileY << 7, plane));
-			}
-		}
-
-		ground = Math.min(ground, heightAt(worldView, x, y, plane));
-		ground = Math.min(ground, heightAt(worldView, x - half, y - half, plane));
-		ground = Math.min(ground, heightAt(worldView, x - half, y + half, plane));
-		ground = Math.min(ground, heightAt(worldView, x + half, y - half, plane));
-		return Math.min(ground, heightAt(worldView, x + half, y + half, plane));
-	}
-
-	private int heightAt(WorldView worldView, int x, int y, int plane)
-	{
-		return worldView.getTileHeight(x, y, plane);
 	}
 
 	private static final class Frame

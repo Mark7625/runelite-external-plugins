@@ -35,5 +35,9 @@ plugin rejected from the hub:
 ./gradlew run
 ```
 
+In IntelliJ, the committed **Run Plugin** configuration (`.run/`) does the same thing, so
+it survives renaming the plugin — it calls the `run` task rather than naming the main
+class directly.
+
 See [Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts) for logging in to the
 development client.
